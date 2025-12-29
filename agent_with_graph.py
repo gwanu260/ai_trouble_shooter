@@ -52,18 +52,3 @@ def ask_claude(user_input: str) -> str:
 
     # content 블록 중 text만 합쳐서 반환(안전)
     return "\n".join([b.text for b in resp.content if getattr(b, "type", None) == "text"]).strip()
-
-
-if __name__ == "__main__":
-    print("Agent 시작, 종료시 q 입력")
-
-    while True:
-        user_input = input("\n사용자: ")
-        if user_input.lower() == "q":
-            break
-
-        try:
-            answer = ask_claude(user_input)
-            print("Agent:", answer)
-        except Exception as e:
-            print("Agent: 오류 발생:", e)
