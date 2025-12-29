@@ -12,7 +12,7 @@ if st.button("분석하기"):
         st.warning("에러 로그를 입력해주세요!")
     else:
         with st.spinner("분석 중..."):
-            payload = {"log": log_input}
+            payload = {"error_log": log_input}
             response = requests.post(API_URL, json=payload)
 
             if response.status_code == 200:
