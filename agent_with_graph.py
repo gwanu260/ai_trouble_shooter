@@ -18,7 +18,7 @@ from anthropic import Anthropic
 load_dotenv()
 
 
-def ask_claude(user_input: str) -> str:
+def ask_claude(system_prompt: str, user_prompt: str) -> str:
     client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     system_prompt = """
 너는 서버 에러 로그를 분석하는 AI 개발자 도우미다.
@@ -50,6 +50,5 @@ def ask_claude(user_input: str) -> str:
         {"role": "user", "content": user_input},
     ],
     )
-
     # content 블록 중 text만 합쳐서 반환(안전)
     return "\n".join([b.text for b in resp.content if getattr(b, "type", None) == "text"]).strip()
