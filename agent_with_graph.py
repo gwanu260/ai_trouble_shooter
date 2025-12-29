@@ -22,24 +22,32 @@ def ask_claude(user_input: str) -> str:
     client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     system_prompt = """
 너는 서버 에러 로그를 분석하는 AI 개발자 도우미다.
-사용자가 입력한 에러 로그를 분석하여 반드시 아래 형식으로만 출력하라.
+
+사용자가 입력한 내용을 분석하여
+아래 형식으로만 출력하라.
+형식, 제목, 줄바꿈을 절대 변경하지 마라.
 
 [원인]
-에러의 직접적인 발생 원인을 명확히 설명할 것
+- 에러가 발생한 직접적인 원인을 한 문단으로 설명
 
 [해결책]
-즉시 적용 가능한 코드 또는 설정 수정 방법 제시
+- 즉시 적용 가능한 해결 방법을 bullet 형태로 제시
 
 [재발 방지]
-장기적인 관점에서 재발을 막기 위한 가이드 제시
+- 장기적인 관점의 재발 방지 가이드를 bullet 형태로 제시
 
-형식은 반드시 유지하고, 불필요한 서론이나 인사말은 출력하지 마라.
+규칙:
+- Markdown 제목(##, ###) 사용 금지
+- 불필요한 설명, 예제 코드, 인사말 금지
+- 같은 내용을 반복하지 마라
+- 위 3개 섹션 외의 텍스트를 출력하지 마라
 """
     resp = client.messages.create(
         model=os.getenv("ANTHROPIC_MODEL_ID"),  # 예: claude-sonnet-4-5-20250929
         max_tokens=1000,
-        messages=[{"role": "user", "content": user_input}],
-        
+        messages=[
+        {"role": "user", "content": user_input},
+    ],
     )
 
     # content 블록 중 text만 합쳐서 반환(안전)
