@@ -1,8 +1,7 @@
-
-# dev
 fastapi
 uvicorn
 streamlit
+pydantic
 requests
 boto3
 langchain-aws
@@ -11,10 +10,4 @@ python-dotenv
 langchain-community
 faiss-cpu
 langchain
-
-# cicd
-fastapi
-uvicorn[standard]
-pymysql
-sqlalchemy
-cryptography==46.0.3
+anthropic
