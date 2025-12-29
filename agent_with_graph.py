@@ -45,6 +45,7 @@ def ask_claude(user_input: str) -> str:
     resp = client.messages.create(
         model=os.getenv("ANTHROPIC_MODEL_ID"),  # 예: claude-sonnet-4-5-20250929
         max_tokens=1000,
+        system=system_prompt,
         messages=[
         {"role": "user", "content": user_input},
     ],
