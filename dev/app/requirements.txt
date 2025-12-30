@@ -11,3 +11,5 @@ langchain-community
 faiss-cpu
 langchain
 anthropic
+langchain-anthropic
+pinecone

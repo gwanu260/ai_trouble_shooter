@@ -1,68 +1,93 @@
-import os
-from typing import TypedDict, List, Optional, Literal
+from typing import Optional, Literal
 from dotenv import load_dotenv
-from anthropic import Anthropic
-from langgraph.graph import StateGraph, END, START
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-from prompts import PROMPTS 
+import os
+from langgraph.graph import StateGraph, START, END, MessagesState
+from langgraph.prebuilt import ToolNode, tools_condition
+from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
+from langchain_anthropic import ChatAnthropic
+from prompts import PROMPTS
+from tools import rag_search_tool
 
 load_dotenv()
 
-# 1. 상태 정의
-class AgentState(TypedDict):
-    messages: List[BaseMessage]
-    persona: Literal["junior", "senior"]
-    input_mode: Literal["log", "code", "log_code"]
-    log_text: Optional[str]
-    code_text: Optional[str]
-
-# 2. 클로드 호출 공통 로직
-def call_anthropic(system_prompt: str, user_content: str) -> str:
-    client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    resp = client.messages.create(
-        model=os.getenv("ANTHROPIC_MODEL_ID"),
-        max_tokens=1500,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_content}],
-    )
-    return "".join([b.text for b in resp.content if hasattr(b, 'text')]).strip()
-
-# 3. 노드 생성 팩토리
-def make_node(persona: str, mode: str):
-    def node(state: AgentState):
-        system_prompt = PROMPTS.get((persona, mode), "에러 분석 전문가입니다.")
-        
-        # 입력 데이터 구성
-        user_content = ""
-        if state["log_text"]: user_content += f"[에러 로그]\n{state['log_text']}\n\n"
-        if state["code_text"]: user_content += f"[코드 스니펫]\n{state['code_text']}"
-        
-        result = call_anthropic(system_prompt, user_content)
-        return {"messages": [AIMessage(content=result)]}
-    return node
-
-# 4. 라우터 함수
-def router(state: AgentState):
-    return f"{state['persona']}_{state['input_mode']}"
-
-# 5. 그래프 구축
-builder = StateGraph(AgentState)
-
-# 노드 등록 (6가지 조합)
-modes = ["log", "code", "log_code"]
-personas = ["junior", "senior"]
-
-for p in personas:
-    for m in modes:
-        node_id = f"{p}_{m}"
-        builder.add_node(node_id, make_node(p, m))
-        builder.add_edge(node_id, END)
-
-builder.add_conditional_edges(
-    START, 
-    router, 
-    {f"{p}_{m}": f"{p}_{m}" for p in personas for m in modes}
+# LLM 설정
+llm = ChatAnthropic(
+    model=os.getenv("ANTHROPIC_MODEL_ID"),
+    api_key=os.getenv("ANTHROPIC_API_KEY"),
+    temperature=0.4,
+    max_tokens=1000,
 )
 
-# 최종 컴파일된 그래프 객체
-app = builder.compile()
+class AgentState(MessagesState):
+    persona: str
+    input_mode: str
+    log_text: str | None
+    code_text: str | None
+
+# Tool 설정
+tools = [rag_search_tool]
+llm_with_tools = llm.bind_tools(tools)
+tool_node = ToolNode(tools)
+
+def build_user_prompt(mode: str, log_text: str, code_text: str) -> str:
+    log_text = log_text or ""
+    code_text = code_text or ""
+    if mode == "log":
+        return f"[로그]\n{log_text}"
+    if mode == "code":
+        return f"[코드]\n{code_text}"
+    return f"[로그]\n{log_text}\n\n[코드]\n{code_text}"
+
+def agent_node(state: AgentState):
+    persona = state.get("persona", "junior")
+    mode = state.get("input_mode", "log")
+    
+    # 1. 페르소나에 맞는 시스템 프롬프트 로드
+    system_prompt = PROMPTS[(persona, mode)]
+    
+    # 2. 메시지 기록 관리
+    current_messages = state.get("messages", [])
+    
+    # 처음 실행 시 유저 입력 구성
+    if not current_messages:
+        user_content = build_user_prompt(
+            mode, 
+            state.get("log_text") or "", 
+            state.get("code_text") or ""
+        )
+        current_messages = [HumanMessage(content=user_content)]
+
+    # 3. 도구 사용 여부 확인 (도구를 이미 사용했다면 요약 답변 유도)
+    used_tool = any(isinstance(m, ToolMessage) for m in current_messages)
+    
+    final_system_msg = system_prompt
+    if used_tool:
+        final_system_msg += "\n\n검색된 지식을 바탕으로 최종 답변을 작성하세요. 추가 도구 호출은 중단하세요."
+
+    # 4. LLM 호출
+    full_input = [SystemMessage(content=final_system_msg)] + current_messages
+    response = llm_with_tools.invoke(full_input)
+
+    # MessagesState는 리스트를 반환하면 자동으로 합쳐짐
+    return {"messages": [response]}
+
+# 그래프 정의
+graph = StateGraph(AgentState)
+
+graph.add_node("agent", agent_node)
+graph.add_node("tools", tool_node)
+
+graph.add_edge(START, "agent")
+
+graph.add_conditional_edges(
+    "agent",
+    tools_condition,
+    {
+        "tools": "tools",
+        END: END,
+    },
+)
+
+graph.add_edge("tools", "agent")
+
+app = graph.compile()
