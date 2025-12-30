@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, END, MessagesState, START
 from typing import TypedDict, List, Optional, Literal
 from langchain_core.tools import tool
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 from langchain_aws import ChatBedrockConverse, ChatBedrock
 from langgraph.prebuilt import ToolNode, tools_condition
 from dotenv import load_dotenv
@@ -15,140 +15,108 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
 from anthropic import Anthropic
+from langchain_anthropic import ChatAnthropic
+from langgraph.prebuilt import ToolNode, tools_condition
 from prompts import PROMPTS
-from tools import rag_search
+from tools import rag_search_tool
 
 load_dotenv()
 
-
-def ask_claude(system_prompt: str, user_prompt: str) -> str:
-    client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    
-    resp = client.messages.create(
-    model=os.getenv("ANTHROPIC_MODEL_ID"),
+llm = ChatAnthropic(
+    model=os.getenv("ANTHROPIC_MODEL_ID"),  # ex) claude-3-sonnet-20240229
+    api_key=os.getenv("ANTHROPIC_API_KEY"),
+    temperature=0.4,
     max_tokens=1000,
-    system=system_prompt,
-    messages=[{"role": "user", "content": user_prompt}],
 )
-    # content 블록 중 text만 합쳐서 반환(안전)
-    return "\n".join([b.text for b in resp.content if getattr(b, "type", None) == "text"]).strip()
-
 class AgentState(MessagesState):
-    persona: Literal["junior", "senior"]
-    input_mode: Literal["log", "code", "log_code"]
-    log_text: Optional[str]
-    code_text: Optional[str]
+    persona: str          # "junior" | "senior"
+    input_mode: str       # "log" | "code" | "log_code"
+    log_text: str | None
+    code_text: str | None
 
-def router(state: AgentState) -> str:
+tools = [rag_search_tool]
+llm_with_tools = llm.bind_tools(tools)
+tool_node = ToolNode(tools)
+
+# ------------------------------
+# def agent_node(state: AgentState):
+#     response = llm_with_tools.invoke(state["messages"])
+#     return {"messages": [response]}
+# ------------------------------
+
+def build_user_prompt(mode: str, log_text: str, code_text: str) -> str:
+    log_text = log_text or ""
+    code_text = code_text or ""
+
+    if mode == "log":
+        return f"[로그]\n{log_text}"
+    if mode == "code":
+        return f"[코드]\n{code_text}"
+    return f"[로그]\n{log_text}\n\n[코드]\n{code_text}"
+
+def agent_node(state: AgentState):
     persona = state.get("persona", "junior")
     mode = state.get("input_mode", "log")
 
-    if persona == "junior" and mode == "log":
-        return "junior_log"
-    if persona == "junior" and mode == "code":
-        return "junior_code"
-    if persona == "junior" and mode == "log_code":
-        return "junior_log_code"
+    system_prompt = PROMPTS[(persona, mode)]
+    user_prompt = build_user_prompt(
+        mode,
+        state.get("log_text") or "",
+        state.get("code_text") or "",
+    )
 
-    if persona == "senior" and mode == "log":
-        return "senior_log"
-    if persona == "senior" and mode == "code":
-        return "senior_code"
-    return "senior_log_code"   
+    # 🔑 이미 tool을 썼는지 판단 (state 기준)
+    used_tool = any(isinstance(m, ToolMessage) for m in state.get("messages", []))
 
-def make_analyze_node(persona: Literal["junior", "senior"], mode: Literal["log", "code", "log_code"]):
-    def node(state: AgentState):
-        system_prompt = PROMPTS[(persona, mode)]
+    if not used_tool:
+        user_prompt += "\n\n필요하면 rag_search 도구를 사용해 관련 지식을 조회한 뒤 답해라."
+    else:
+        user_prompt += "\n\n이미 제공된 정보를 바탕으로 최종 답변만 작성하라. 추가 도구 호출은 하지 마라."
 
-        log_text = state.get("log_text") or ""
-        code_text = state.get("code_text") or ""
+    new_messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_prompt),
+    ]
 
-        if mode == "log":
-            user_prompt = f"[로그]\n{log_text}"
-        elif mode == "code":
-            user_prompt = f"[코드]\n{code_text}"
-        else:
-            user_prompt = f"[로그]\n{log_text}\n\n[코드]\n{code_text}"
+    # ✅ 핵심 수정: state["messages"] + new_messages
+    response = llm_with_tools.invoke(
+        state.get("messages", []) + new_messages
+    )
 
-        result = ask_claude(system_prompt, user_prompt)
+    return {
+        "messages": state.get("messages", []) + [response]
+    }
 
-        return {"messages": [AIMessage(content=result)]}
 
-    return node
-
-# -------------------------
-# 2-5) 그래프 구성
-# -------------------------
 graph = StateGraph(AgentState)
 
-graph.add_node("junior_log", make_analyze_node("junior", "log"))
-graph.add_node("junior_code", make_analyze_node("junior", "code"))
-graph.add_node("junior_log_code", make_analyze_node("junior", "log_code"))
-graph.add_node("senior_log", make_analyze_node("senior", "log"))
-graph.add_node("senior_code", make_analyze_node("senior", "code"))
-graph.add_node("senior_log_code", make_analyze_node("senior", "log_code"))
+graph.add_node("agent", agent_node)
+graph.add_node("tools", tool_node)
+
+graph.add_edge(START, "agent")
 
 graph.add_conditional_edges(
-    START,
-    router,
+    "agent",
+    tools_condition,
     {
-        "junior_log": "junior_log",
-        "junior_code": "junior_code",
-        "junior_log_code": "junior_log_code",
-        "senior_log": "senior_log",
-        "senior_code": "senior_code",
-        "senior_log_code": "senior_log_code",
+        "tools": "tools",
+        END: END,
     },
 )
 
-for n in [
-    "junior_log",
-    "junior_code",
-    "junior_log_code",
-    "senior_log",
-    "senior_code",
-    "senior_log_code",
-]:
-    graph.add_edge(n, END)
+graph.add_edge("tools", "agent")
 
 app = graph.compile()
 
-
-# -------------------------
-# 2-6) CLI 테스트 (원하면 제거)
-# -------------------------
 if __name__ == "__main__":
-    print("Agent 시작, 종료시 q 입력")
-    print("예) persona=junior|senior, mode=log|code|log_code")
+    test_state = {
+        "messages": [],  # agent_node에서 System/Human 새로 만들어 호출하니 빈 리스트 OK
+        "persona": "junior",
+        "input_mode": "log",
+        "log_text": "ValidationException: The provided model identifier is invalid.",
+        "code_text": ""
+    }
 
-    while True:
-        persona = input("\npersona(junior/senior): ").strip().lower()
-        if persona == "q":
-            break
-        mode = input("mode(log/code/log_code): ").strip().lower()
-        if mode == "q":
-            break
-
-        if mode == "log":
-            log_text = input("\n[로그 입력]\n> ")
-            code_text = ""
-        elif mode == "code":
-            log_text = ""
-            code_text = input("\n[코드 입력]\n> ")
-        else:
-            log_text = input("\n[로그 입력]\n> ")
-            code_text = input("\n[코드 입력]\n> ")
-
-        state: AgentState = {
-            "messages": [HumanMessage(content="analyze")],
-            "persona": "senior" if persona == "senior" else "junior",
-            "input_mode": "log_code" if mode == "log_code" else ("code" if mode == "code" else "log"),
-            "log_text": log_text,
-            "code_text": code_text,
-        }
-
-        try:
-            out = app.invoke(state)
-            print("\nAgent:\n", out["messages"][-1].content)
-        except Exception as e:
-            print("Agent: 오류 발생:", e)
+    out = app.invoke(test_state)
+    print("\n=== OUTPUT ===")
+    print(out["messages"][-1].content)
