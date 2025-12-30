@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from api import app
+from app.api import app
 
 # TestClient
 # 서버를 켜지 않고도 요청/응답을 검증할 수 있게 해주는 테스트 도구
