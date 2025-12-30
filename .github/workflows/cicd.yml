@@ -26,4 +26,4 @@ jobs:
       env:
         PYTHONPATH: .
       run: |
-        pytest dev/tests/ -vv
+        pytest dev/ui/ -vv
