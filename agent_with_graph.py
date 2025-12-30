@@ -1,24 +1,13 @@
-from langgraph.graph import StateGraph, END, MessagesState, START
-from typing import TypedDict, List, Optional, Literal
-from langchain_core.tools import tool
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
-from langchain_aws import ChatBedrockConverse, ChatBedrock
-from langgraph.prebuilt import ToolNode, tools_condition
+from typing import Optional, Literal
 from dotenv import load_dotenv
 import os
-import boto3
-from langgraph.checkpoint.memory import MemorySaver
-from langchain_community.vectorstores import FAISS
-from langchain_aws import BedrockEmbeddings
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
-from anthropic import Anthropic
-from langchain_anthropic import ChatAnthropic
+from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.prebuilt import ToolNode, tools_condition
+from langchain_core.messages import SystemMessage,HumanMessage,ToolMessage
+from langchain_anthropic import ChatAnthropic
 from prompts import PROMPTS
 from tools import rag_search_tool
+from langgraph.checkpoint.memory import MemorySaver
 
 load_dotenv()
 
@@ -37,12 +26,6 @@ class AgentState(MessagesState):
 tools = [rag_search_tool]
 llm_with_tools = llm.bind_tools(tools)
 tool_node = ToolNode(tools)
-
-# ------------------------------
-# def agent_node(state: AgentState):
-#     response = llm_with_tools.invoke(state["messages"])
-#     return {"messages": [response]}
-# ------------------------------
 
 def build_user_prompt(mode: str, log_text: str, code_text: str) -> str:
     log_text = log_text or ""
@@ -86,7 +69,6 @@ def agent_node(state: AgentState):
     return {
         "messages": state.get("messages", []) + [response]
     }
-
 
 graph = StateGraph(AgentState)
 
