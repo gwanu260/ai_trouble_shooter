@@ -16,6 +16,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
 from anthropic import Anthropic
 from prompts import PROMPTS
+from tools import rag_search
 
 load_dotenv()
 
