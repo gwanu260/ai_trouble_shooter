@@ -6,7 +6,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
 from langchain_anthropic import ChatAnthropic
 from dev.app.prompts import PROMPTS
-from tools import rag_search_tool
+from dev.app.tools import rag_search_tool
 
 load_dotenv()
 
