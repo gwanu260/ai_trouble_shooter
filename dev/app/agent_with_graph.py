@@ -21,7 +21,7 @@ def call_anthropic(system_prompt: str, user_content: str) -> str:
     client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     resp = client.messages.create(
         model=os.getenv("ANTHROPIC_MODEL_ID"),
-        max_tokens=1000,
+        max_tokens=1500,
         system=system_prompt,
         messages=[{"role": "user", "content": user_content}],
     )

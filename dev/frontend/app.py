@@ -7,44 +7,36 @@ API_URL = "http://localhost:8000/analyze/log"
 st.set_page_config(page_title="🔍 AI Trouble Shooter", layout="wide")
 
 # ---------- Header ---------- #
-col_title, col_mode = st.columns([8, 2])
-with col_title:
-    st.markdown("## 🔍 AI Trouble Shooter — Code Analyzer")
-with col_mode:
-    # 1. 시니어/주니어 토글 스위치
-    mode_switch = st.toggle("시니어 모드", value=False)
+st.markdown("## 🔍 AI Trouble Shooter — Code Analyzer")
+st.markdown("---")
 
 # ---------- Sidebar ---------- #
 with st.sidebar:
     st.title("⚙️ 설정")
-    # 토글 스위치와 연동된 셀렉트 박스
+    # 이제 모든 분석 모드(페르소나) 결정은 여기서 이루어집니다.
     level = st.selectbox(
         "사용자 레벨", 
         ["주니어", "시니어"], 
-        index=(1 if mode_switch else 0),
-        help="분석 결과의 깊이를 조절합니다."
+        index=0,
+        help="주니어는 친절하고 상세한 설명을, 시니어는 핵심 위주의 전문적 분석을 제공합니다."
     )
     language = st.selectbox("언어", ["auto", "python", "C", "javascript"], index=0)
 
-st.markdown("---")
-
-# ---------- Input Area (양옆 배치) ---------- #
+# ---------- Input Area ---------- #
 st.markdown("#### 🧩 분석 입력")
-
-# 2. columns를 사용하여 입력창을 양옆으로 배치
 col_log, col_code = st.columns(2)
 
 with col_log:
     input_log = st.text_area(
         "🐞 에러 로그 입력 (선택)", 
-        height=250, 
+        height=300, 
         placeholder="에러 트레이스백을 입력하세요..."
     )
 
 with col_code:
     input_code = st.text_area(
         "💡 코드 스니펫 입력 (선택)", 
-        height=250, 
+        height=300, 
         placeholder="관련 소스 코드를 입력하세요..."
     )
 
@@ -69,7 +61,7 @@ if analyze_clicked:
             else:
                 mode = "log"
 
-            # 3. 최종 결정된 페르소나 값 (영문으로 변환하여 백엔드 전달)
+            # 사이드바에서 선택한 값에 따라 페르소나 설정
             persona_val = "senior" if level == "시니어" else "junior"
 
             payload = {
@@ -81,24 +73,20 @@ if analyze_clicked:
             
             try:
                 response = requests.post(API_URL, json=payload)
-                
                 if response.status_code != 200:
-                    st.error("❌ FastAPI 서버에 문제가 있습니다. 연결을 확인하세요.")
+                    st.error("❌ FastAPI 서버 응답 오류가 발생했습니다.")
                 else:
                     result = response.json()
                     st.success(f"🎯 {level} 모드 분석 완료!")
 
-                    # 결과 레이아웃
+                    # 결과 레이아웃 (3컬럼)
                     col_cause, col_solution, col_prevent = st.columns(3)
-
                     with col_cause:
                         st.markdown("### 🔴 원인")
                         st.info(result.get("cause", "정보 없음"))
-
                     with col_solution:
                         st.markdown("### 🔵 해결")
                         st.success(result.get("solution", "해결 가이드 없음"))
-
                     with col_prevent:
                         st.markdown("### 🟢 재발 방지")
                         st.warning(result.get("prevention", "데이터 부족"))
