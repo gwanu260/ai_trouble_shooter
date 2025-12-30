@@ -13,7 +13,7 @@ def test_ui_search_success(mock_get):
     mock_get.return_value       = mock_response
 
     # 2. Streamlit 앱 로드 (ui.py 경로 지정)
-    at = AppTest.from_file("ui.py")
+    at = AppTest.from_file("dev/ui/ui.py")
     at.run()
 
     # 3. 사용자 인터랙션 시뮬레이션
