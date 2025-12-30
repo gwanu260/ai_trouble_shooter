@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, Literal
 import json
 import re
-from .agent_with_graph import app as app_graph
+from dev.app.agent_with_graph import app as app_graph
 
 app = FastAPI()
 
