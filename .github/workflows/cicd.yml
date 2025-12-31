@@ -80,70 +80,47 @@ jobs:
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/ui:latest
 
-  # 2. EC에 배포
-  EC2-deploy:
-      # 반드시 사전에 fastapi, nginx 이미지가 도커허브에 등록되어 있어야한다
-      needs:  docker-build-deploy
+    EC2-deploy:
+      needs: docker-build-deploy
       runs-on: ubuntu-latest
       steps:
-          # 새로운 잡에서 새롭게 리눅스 할당 소스코드를 체크아웃함
-          - name: Code Checkout
-            uses: actions/checkout@v3
+        - uses: actions/checkout@v4
 
-          - name: DEBUG FILE CHECK
-            run: |
-              pwd
-              ls -al
-              find . -iname "*compose*"
-        
-          # 아래 파일은 소스코드를 체크아웃함으로써 획득할 수 있다.
-          # AWS의 EC2에 docker-compose.yml 파일을 업로드
-          # appleboy/scp-action@master => EC2에 파일 카피 기능 제공 도구
-          - name: Copy docker-compose.yml to EC2
-            uses: appleboy/scp-action@master
-            with:
-              host: ${{ secrets.EC2_HOST }}
-              username: ${{ secrets.EC2_USERNAME }}
-              key: ${{ secrets.EC2_KEY }}
-              port: 22                
-              source: "Docker-compose.yml" 
-              # /home/ubuntu/deploy/dev/docker-compose.yml 생성됨
-              target: "/home/${{ secrets.EC2_USERNAME }}/deploy"
-          
-          - name: Deploy via SSH
-            uses: appleboy/ssh-action@master
-            with:
-              host: ${{ secrets.EC2_HOST }}
-              username: ${{ secrets.EC2_USERNAME }}
-              key: ${{ secrets.EC2_KEY }}
-              port: 22
-              script: |
-                # cd /home/${{ secrets.EC2_USERNAME }}/deploy
+        - name: Copy Docker-compose.yml to EC2
+          uses: appleboy/scp-action@master
+          with:
+            host: ${{ secrets.EC2_HOST }}
+            username: ${{ secrets.EC2_USERNAME }}
+            key: ${{ secrets.EC2_KEY }}
+            port: 22
+            source: "Docker-compose.yml"
+            target: "/home/${{ secrets.EC2_USERNAME }}/deploy"
 
-                # ===============================
-                # .env 파일 생성 (Secrets → Runtime)
-                # ===============================
-                echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" >> .env
+        - name: Deploy via SSH
+          uses: appleboy/ssh-action@master
+          with:
+            host: ${{ secrets.EC2_HOST }}
+            username: ${{ secrets.EC2_USERNAME }}
+            key: ${{ secrets.EC2_KEY }}
+            port: 22
+            script: |
+              cd /home/${{ secrets.EC2_USERNAME }}/deploy
 
-                # AWS / Bedrock
-                echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> .env
-                echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
-                echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
-                echo "AWS_BEARER_TOKEN_BEDROCK=${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}" >> .env
-                echo "ANTHROPIC_MODEL_ID=${{ secrets.ANTHROPIC_MODEL_ID }}" >> .env
-                echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> .env
+              # .env 생성 (덮어쓰기)
+              cat <<EOF > .env
+              DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+              AWS_REGION=${{ secrets.AWS_REGION }}
+              AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+              AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+              AWS_BEARER_TOKEN_BEDROCK=${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
+              ANTHROPIC_MODEL_ID=${{ secrets.ANTHROPIC_MODEL_ID }}
+              ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+              PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}
+              PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}
+              PINECONE_NAMESPACE=${{ secrets.PINECONE_NAMESPACE }}
+              BEDROCK_EMBEDDING_MODEL_ID=${{ secrets.BEDROCK_EMBEDDING_MODEL_ID }}
+              EOF
 
-                # Pinecone
-                echo "PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}" >> .env
-                echo "PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}" >> .env
-                echo "PINECONE_NAMESPACE=${{ secrets.PINECONE_NAMESPACE }}" >> .env
-
-                # Embedding
-                echo "BEDROCK_EMBEDDING_MODEL_ID=${{ secrets.BEDROCK_EMBEDDING_MODEL_ID }}" >> .env
-
-                # ===============================
-                # 컨테이너 배포
-                # ===============================
-                docker-compose pull
-                docker-compose up -d
-                docker image prune -f
+              docker-compose -f Docker-compose.yml pull
+              docker-compose -f Docker-compose.yml up -d
+              docker ps -a
