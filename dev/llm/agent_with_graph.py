@@ -15,7 +15,7 @@ llm = ChatAnthropic(
     model=os.getenv("ANTHROPIC_MODEL_ID"),
     api_key=os.getenv("ANTHROPIC_API_KEY"),
     temperature=0.4,
-    max_tokens=1000,
+    max_tokens=1500,
 )
 
 class AgentState(MessagesState):
