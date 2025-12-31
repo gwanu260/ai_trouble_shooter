@@ -24,9 +24,9 @@ from pinecone import Pinecone
 from langchain_core.tools import tool
 from typing import Optional
 
-embedder: Optional[BedrockEmbeddings] = None
-pinecone_index = None
-namespace: Optional[str] = None
+_embedder: Optional[BedrockEmbeddings] = None
+_pinecone_index = None
+_namespace: Optional[str] = None
 
 def _require_env(name: str) -> str:
     v = os.getenv(name)
