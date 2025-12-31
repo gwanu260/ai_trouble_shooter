@@ -5,7 +5,7 @@ FROM python:3.12.0-slim
 WORKDIR /app
 
 # 3. requirements.txt 복사 및 설치
-COPY requirements.txt .
+COPY app/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
 && pip install --no-cache-dir -r requirements.txt
 
@@ -13,3 +13,11 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY . .
 
 # 5. 백그라운드(데몬)으로 서비스 가동 -> 컴포즈에서 대체되었음
+
+# 3. requirements.txt 복사 및 설치
+COPY app/requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
+
+# 4. 코드 복사
+COPY . .

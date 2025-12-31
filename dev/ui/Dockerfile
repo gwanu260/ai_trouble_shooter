@@ -5,7 +5,7 @@ FROM python:3.12.0-slim
 WORKDIR /app
 
 # 3. requirements.txt 복사 및 설치
-COPY requirements.txt .
+COPY app/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
 && pip install --no-cache-dir -r requirements.txt
 
