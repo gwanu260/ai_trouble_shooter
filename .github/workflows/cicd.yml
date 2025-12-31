@@ -124,7 +124,7 @@ jobs:
             cd /home/${{ secrets.EC2_USERNAME }}/deploy
 
             # ===== 4. (선택) .env 생성 — 필요하면만 =====
-            cat > .env <<EOF
+            cat > .env <<-EOF
               DOCKER_USERNAME=$DOCKER_USERNAME
               AWS_REGION=$AWS_REGION
               AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
@@ -142,4 +142,3 @@ jobs:
             docker-compose up -d --force-recreate
             docker image prune -f
             docker ps -a
-            
