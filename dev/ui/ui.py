@@ -11,7 +11,7 @@ st.markdown("---")
 with st.sidebar:
     st.title("⚙️ 설정")
     level = st.selectbox("사용자 레벨", ["주니어", "시니어"], index=0)
-    language = st.selectbox("언어", ["auto", "python", "C", "javascript"], index=0)
+    language = st.selectbox("언어", ["python", "C", "javascript"], index=0)
 
 st.markdown("#### 🧩 분석 입력")
 col_log, col_code = st.columns(2)
