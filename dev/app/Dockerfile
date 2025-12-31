@@ -1,7 +1,7 @@
 FROM python:3.12.0-slim
 
 WORKDIR /app
-
+ENV PYTHONPATH=/app
 # requirements.txt 경로 수정 (핵심)
 COPY app/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
