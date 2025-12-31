@@ -46,32 +46,40 @@ jobs:
               ls ./dev -al
             shell: bash
           
-          # # 도커 허브 로그인 단계 v2/v3
-          # - name: Login to Docker Hub
-          #   uses: docker/login-action@v2
-          #   with:
-          #     username: ${{ secrets.DOCKER_USERNAME }}
-          #     password: ${{ secrets.DOCKER_PASSWORD }}
+          # 도커 허브 로그인 단계 v2/v3
+          - name: Login to Docker Hub
+            uses: docker/login-action@v2
+            with:
+              username: ${{ secrets.DOCKER_USERNAME }}
+              password: ${{ secrets.DOCKER_PASSWORD }}
           
-          # # fastapi 관련 앱이 설정되어 있는 이미지 생성 및 도커허브 푸시 v4~v6
-          # - name: Build and Push fastapi 앱
-          #   uses: docker/build-push-action@v4
-          #   with:
-          #     # Dockerfile 위치
-          #     context: ./dev/app
-          #     file: ./dev/app/Dockerfile
-          #     push: true
-          #     tags: ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
+          # fastapi 관련 앱이 설정되어 있는 이미지 생성 및 도커허브 푸시 v4~v6
+          - name: Build and Push fastapi 앱
+            uses: docker/build-push-action@v4
+            with:
+              # Dockerfile 위치
+              context: ./dev/app
+              file: ./dev/app/Dockerfile
+              push: true
+              tags: ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
 
-          # # 커스텀된 nginx 이미지 생성 및 도커허브 푸시 v4~v6
-          # - name: Build and Push nginx
-          #   uses: docker/build-push-action@v4
-          #   with:                
-          #     context: ./dev/nginx
-          #     file: ./dev/nginx/Dockerfile
-          #     push: true
-          #     tags: ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest
-  
+          # 커스텀된 nginx 이미지 생성 및 도커허브 푸시 v4~v6
+          - name: Build and Push nginx
+            uses: docker/build-push-action@v4
+            with:                
+              context: ./dev/nginx
+              file: ./dev/nginx/Dockerfile
+              push: true
+              tags: ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest
+
+          - name: Build and Push ui
+            uses: docker/build-push-action@v4
+            with:                
+              context: ./dev/ui
+              file: ./dev/ui/Dockerfile
+              push: true
+              tags: ${{ secrets.DOCKER_USERNAME }}/ui:latest
+
   # 2. EC에 배포
   EC2-deploy:
       # 반드시 사전에 fastapi, nginx 이미지가 도커허브에 등록되어 있어야한다
@@ -106,10 +114,10 @@ jobs:
               script: |
                 # cd /home/${{ secrets.EC2_USERNAME }}/deploy/dev
 
-                # # ===============================
-                # # .env 파일 생성 (Secrets → Runtime)
-                # # ===============================
-                # echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" > .env
+                # ===============================
+                # .env 파일 생성 (Secrets → Runtime)
+                # ===============================
+                echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" > .env
 
                 # AWS / Bedrock
                 echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> .env
