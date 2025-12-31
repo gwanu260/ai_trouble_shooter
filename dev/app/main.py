@@ -12,7 +12,7 @@ root_dir = os.path.abspath(os.path.join(current_dir, "../../"))
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
-# from dev.llm.agent_with_graph import app as app_graph
+from dev.llm.agent_with_graph import app as app_graph
 
 app = FastAPI()
 
