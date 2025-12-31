@@ -100,7 +100,7 @@ jobs:
               username: ${{ secrets.EC2_USERNAME }}
               key: ${{ secrets.EC2_KEY }}
               port: 22                
-              source: "./dev/docker-compose.yml"
+              source: "docker-compose.yml"
               # /home/ubuntu/deploy/dev/docker-compose.yml 생성됨
               target: "/home/${{ secrets.EC2_USERNAME }}/deploy"
           
@@ -112,7 +112,7 @@ jobs:
               key: ${{ secrets.EC2_KEY }}
               port: 22
               script: |
-                # cd /home/${{ secrets.EC2_USERNAME }}/deploy/dev
+                # cd /home/${{ secrets.EC2_USERNAME }}/deploy
 
                 # ===============================
                 # .env 파일 생성 (Secrets → Runtime)
