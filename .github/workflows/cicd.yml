@@ -59,7 +59,7 @@ jobs:
             with:
               # Dockerfile 위치
               context: ./dev/app
-              file: ./dev/app/Dockerfile
+              file: ./dev/app/dockerfile
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
 
@@ -68,7 +68,7 @@ jobs:
             uses: docker/build-push-action@v4
             with:                
               context: ./dev/nginx
-              file: ./dev/nginx/Dockerfile
+              file: ./dev/nginx/dockerfile
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest
 
@@ -76,7 +76,7 @@ jobs:
             uses: docker/build-push-action@v4
             with:                
               context: ./dev/ui
-              file: ./dev/ui/Dockerfile
+              file: ./dev/ui/dockerfile
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/ui:latest
 
@@ -100,7 +100,7 @@ jobs:
               username: ${{ secrets.EC2_USERNAME }}
               key: ${{ secrets.EC2_KEY }}
               port: 22                
-              source: "Docker-compose.yml"
+              source: "docker-compose.yml"
               # /home/ubuntu/deploy/dev/docker-compose.yml 생성됨
               target: "/home/${{ secrets.EC2_USERNAME }}/deploy"
           
