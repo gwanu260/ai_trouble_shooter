@@ -11,6 +11,8 @@ def _count_sentences_ko(text: str) -> int:
     prevention 최소 2문장 규칙 검증용(대충이라도 문장 경계를 센다)
     - 한국어/영문 혼합을 고려해서 마침표/물음표/느낌표/줄바꿈 기반으로 분리
     """
+# JSON 문자열에서 줄바꿈이 "\\n"으로 들어올 수 있으므로 실제 줄바꿈으로 변환
+    text = text.replace("\\n", "\n")
     parts = [p.strip() for p in re.split(r"[.!?]\s+|\n+", text) if p.strip()]
     return len(parts)
 
