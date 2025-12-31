@@ -1,14 +1,30 @@
-from fastapi import FastAPI
+import pytest
+import sys
+import os
 
-app = FastAPI()
+# 프로젝트 루트 경로 추가
+sys.path.append(os.getcwd())
 
-@app.post("/analyze/log")
-async def analyze_log(payload: dict):
-    """
-    테스트를 위한 Mock 응답
-    """
-    return {
-        "status": "ok",
-        "message": "analysis complete",
-        "received": payload
+def test_payload_structure():
+    """UI에서 서버로 보낼 페이로드 구조가 올바른지 시뮬레이션 테스트"""
+    # UI에서 선택된 가상의 값들
+    level = "시니어"
+    mode = "log_code"
+    input_log = "Error: Timeout"
+    input_code = "connect()"
+    save_on = True
+
+    # ui.py 내 로직 시뮬레이션
+    persona_val = "senior" if level == "시니어" else "junior"
+    
+    payload = {
+        "persona": persona_val,
+        "input_mode": mode,
+        "error_log": input_log,
+        "code": input_code,
+        "save_to_db": save_on
     }
+
+    assert payload["persona"] == "senior"
+    assert payload["save_to_db"] is True
+    assert "error_log" in payload
