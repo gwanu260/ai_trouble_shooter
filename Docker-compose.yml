@@ -3,7 +3,7 @@ services:
     image: ${DOCKER_USERNAME}/fastapi-app:latest
     container_name: fastapi_app
     restart: always
-    command: uvicorn dev.app.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     env_file:
       - .env
     ports:
