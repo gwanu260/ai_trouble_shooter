@@ -59,7 +59,7 @@ jobs:
             with:
               # Dockerfile 위치
               context: ./dev/app
-              file: ./dev/app/dockerfile
+              file: ./dev/app/Dockerfile
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
 
@@ -68,7 +68,7 @@ jobs:
             uses: docker/build-push-action@v4
             with:                
               context: ./dev/nginx
-              file: ./dev/nginx/dockerfile
+              file: ./dev/nginx/Dockerfile
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest
 
@@ -76,7 +76,7 @@ jobs:
             uses: docker/build-push-action@v4
             with:                
               context: ./dev/ui
-              file: ./dev/ui/dockerfile
+              file: ./dev/ui/Dockerfile
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/ui:latest
 
