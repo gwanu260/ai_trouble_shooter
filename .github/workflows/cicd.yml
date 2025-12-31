@@ -3,7 +3,7 @@ name: AI Trouble Shooter
 # 언제 실행될지 정의 (main 브랜치에 push나 pull_request 발생 시)
 on:
   push:
-    branches: [ "main", "advanced_llm" ]
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
