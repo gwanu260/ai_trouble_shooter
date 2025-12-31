@@ -115,6 +115,18 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_KEY }}
           port: 22
+          envs: |
+            DOCKER_USERNAME
+            AWS_REGION
+            AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY
+            AWS_BEARER_TOKEN_BEDROCK
+            ANTHROPIC_MODEL_ID
+            ANTHROPIC_API_KEY
+            PINECONE_API_KEY
+            PINECONE_INDEX
+            PINECONE_NAMESPACE
+            BEDROCK_EMBEDDING_MODEL_ID
           script: |
             cd /home/${{ secrets.EC2_USERNAME }}/deploy
 
@@ -133,5 +145,5 @@ jobs:
             EOF
 
             docker-compose pull
-            docker-compose up -d
+            docker-compose up -d --force-recreate
             docker ps -a
