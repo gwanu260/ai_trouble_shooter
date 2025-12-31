@@ -40,6 +40,7 @@ def build_user_prompt(mode: str, log_text: str, code_text: str) -> str:
     return f"[로그]\n{log_text}\n\n[코드]\n{code_text}"
 
 def agent_node(state: AgentState):
+
     persona = state.get("persona", "junior")
     mode = state.get("input_mode", "log")
     
@@ -64,6 +65,8 @@ def agent_node(state: AgentState):
     final_system_msg = system_prompt
     if used_tool:
         final_system_msg += "\n\n검색된 지식을 바탕으로 최종 답변을 작성하세요. 추가 도구 호출은 중단하세요."
+    import sys
+    print("🧭 agent_node end, messages:", len(state["messages"]), file=sys.stderr, flush=True)
 
     # 4. LLM 호출
     full_input = [SystemMessage(content=final_system_msg)] + current_messages
@@ -99,7 +102,18 @@ if __name__ == "__main__":
         "messages": [],  # agent_node에서 System/Human 새로 만들어 호출하니 빈 리스트 OK
         "persona": "junior",
         "input_mode": "log",
-        "log_text": "ValidationException: The provided model identifier is invalid.",
+        "log_text": """
+                    Uncaught ReferenceError: count is not defined
+                    at increment (main.js:10:14)
+                    at HTMLButtonElement.onclick (index.html:25:32)
+                    function showUserName(user) {
+                    console.log(user.name); // user가 undefined
+}
+showUserName();
+        
+        
+        
+        """,
         "code_text": ""
     }
 
