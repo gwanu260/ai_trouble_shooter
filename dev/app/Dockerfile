@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir -r requirements.txt
 
 # 나머지 코드 복사 (dev 전체가 들어옴)
-COPY . .
+COPY . . 
