@@ -1,9 +1,9 @@
-name: AI Trouble Shooter
+name: AI Trouble Shooter CI/CD
 
 # 언제 실행될지 정의 (main 브랜치에 push나 pull_request 발생 시)
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "advanced_fullstack" ]
   pull_request:
     branches: [ "main" ]
 
@@ -32,3 +32,104 @@ jobs:
         PYTHONPATH: .
       run: |
         pytest dev/tests/ -vv
+
+  # git build push 작업
+  docker-build-deploy:        
+      runs-on: ubuntu-latest
+      steps:        
+          - name: Code Checkout
+            uses: actions/checkout@v3
+
+          - name: 검증
+            run: |
+              pwd
+              ls ./dev -al
+            shell: bash
+          
+          # # 도커 허브 로그인 단계 v2/v3
+          # - name: Login to Docker Hub
+          #   uses: docker/login-action@v2
+          #   with:
+          #     username: ${{ secrets.DOCKER_USERNAME }}
+          #     password: ${{ secrets.DOCKER_PASSWORD }}
+          
+          # # fastapi 관련 앱이 설정되어 있는 이미지 생성 및 도커허브 푸시 v4~v6
+          # - name: Build and Push fastapi 앱
+          #   uses: docker/build-push-action@v4
+          #   with:
+          #     # Dockerfile 위치
+          #     context: ./dev/app
+          #     file: ./dev/app/Dockerfile
+          #     push: true
+          #     tags: ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
+
+          # # 커스텀된 nginx 이미지 생성 및 도커허브 푸시 v4~v6
+          # - name: Build and Push nginx
+          #   uses: docker/build-push-action@v4
+          #   with:                
+          #     context: ./dev/nginx
+          #     file: ./dev/nginx/Dockerfile
+          #     push: true
+          #     tags: ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest
+  
+  # 2. EC에 배포
+  EC2-deploy:
+      # 반드시 사전에 fastapi, nginx 이미지가 도커허브에 등록되어 있어야한다
+      needs:  docker-build-deploy
+      runs-on: ubuntu-latest
+      steps:
+          # 새로운 잡에서 새롭게 리눅스 할당 소스코드를 체크아웃함
+          - name: Code Checkout
+            uses: actions/checkout@v3
+        
+          # 아래 파일은 소스코드를 체크아웃함으로써 획득할 수 있다.
+          # AWS의 EC2에 docker-compose.yml 파일을 업로드
+          # appleboy/scp-action@master => EC2에 파일 카피 기능 제공 도구
+          - name: Copy docker-compose.yml to EC2
+            uses: appleboy/scp-action@master
+            with:
+              host: ${{ secrets.EC2_HOST }}
+              username: ${{ secrets.EC2_USERNAME }}
+              key: ${{ secrets.EC2_KEY }}
+              port: 22                
+              source: "./dev/docker-compose.yml"
+              # /home/ubuntu/deploy/dev/docker-compose.yml 생성됨
+              target: "/home/${{ secrets.EC2_USERNAME }}/deploy"
+          
+          - name: Deploy via SSH
+            uses: appleboy/ssh-action@master
+            with:
+              host: ${{ secrets.EC2_HOST }}
+              username: ${{ secrets.EC2_USERNAME }}
+              key: ${{ secrets.EC2_KEY }}
+              port: 22
+              script: |
+                # cd /home/${{ secrets.EC2_USERNAME }}/deploy/dev
+
+                # # ===============================
+                # # .env 파일 생성 (Secrets → Runtime)
+                # # ===============================
+                # echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" > .env
+
+                # AWS / Bedrock
+                echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> .env
+                echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
+                echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
+                echo "AWS_BEARER_TOKEN_BEDROCK=${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}" >> .env
+                echo "ANTHROPIC_MODEL_ID=${{ secrets.ANTHROPIC_MODEL_ID }}" >> .env
+                echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> .env
+
+                # Pinecone
+                echo "PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}" >> .env
+                echo "PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}" >> .env
+                echo "PINECONE_NAMESPACE=${{ secrets.PINECONE_NAMESPACE }}" >> .env
+
+                # Embedding
+                echo "BEDROCK_EMBEDDING_MODEL_ID=${{ secrets.BEDROCK_EMBEDDING_MODEL_ID }}" >> .env
+
+                # ===============================
+                # 컨테이너 배포
+                # ===============================
+                docker-compose pull
+                docker-compose up -d
+                docker image prune -f
