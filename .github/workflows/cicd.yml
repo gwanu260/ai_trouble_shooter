@@ -123,7 +123,7 @@ jobs:
                 # ===============================
                 # .env 파일 생성 (Secrets → Runtime)
                 # ===============================
-                echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" > .env
+                echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" >> .env
 
                 # AWS / Bedrock
                 echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> .env
