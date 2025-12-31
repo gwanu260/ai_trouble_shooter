@@ -22,20 +22,50 @@ load_dotenv()
 from langchain_aws import BedrockEmbeddings
 from pinecone import Pinecone
 from langchain_core.tools import tool
+from typing import Optional
+
+embedder: Optional[BedrockEmbeddings] = None
+pinecone_index = None
+namespace: Optional[str] = None
+
+def _require_env(name: str) -> str:
+    v = os.getenv(name)
+    if not v:
+        raise RuntimeError(
+            f"Missing required environment variable: {name}. "
+            f"Set it in your .env or CI secrets before using rag_search."
+        )
+    return v
+
+def get_embedder() -> BedrockEmbeddings:
+    global _embedder
+    if _embedder is not None:
+        return _embedder
+
+    model_id = _require_env("BEDROCK_EMBEDDING_MODEL_ID")
+    region = _require_env("AWS_REGION")
+
+    _embedder = BedrockEmbeddings(
+        model_id=model_id,
+        region_name=region,
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    )
+    return _embedder
 
 
-# --- RAG 검색용 Embedder ---
-embedder = BedrockEmbeddings(
-    model_id=os.getenv("BEDROCK_EMBEDDING_MODEL_ID"),
-    region_name=os.getenv("AWS_REGION"),
-    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-)
+def get_pinecone_index():
+    global _pinecone_index, _namespace
+    if _pinecone_index is not None:
+        return _pinecone_index
 
-# --- Pinecone 연결 ---
-pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-index = pc.Index(os.getenv("PINECONE_INDEX"))
-namespace = os.getenv("PINECONE_NAMESPACE", "dev")
+    api_key = _require_env("PINECONE_API_KEY")
+    index_name = _require_env("PINECONE_INDEX")
+    _namespace = os.getenv("PINECONE_NAMESPACE", "dev")
+
+    pc = Pinecone(api_key=api_key)
+    _pinecone_index = pc.Index(index_name)
+    return _pinecone_index
 
 def rag_search(query: str, top_k: int = 3) -> str:
     """
@@ -43,7 +73,10 @@ def rag_search(query: str, top_k: int = 3) -> str:
     - query: 사용자 질문 또는 에러 시그니처
     - return: LLM 프롬프트에 바로 넣을 수 있는 문자열
     """
+    embedder = get_embedder()
+    index = get_pinecone_index()
     qvec = embedder.embed_query(query)
+    namespace = _namespace or "dev"
 
     res = index.query(
         vector=qvec,
