@@ -68,7 +68,7 @@ jobs:
             uses: docker/build-push-action@v4
             with:                
               context: ./dev/nginx
-              file: ./dev/nginx/Dockerfile
+              file: ./dev/nginx/Dockerfile 
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest
 
