@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import os
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.prebuilt import ToolNode, tools_condition
-from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
+from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage, AIMessage
 from langchain_anthropic import ChatAnthropic
 from dev.llm.prompts import PROMPTS
 from dev.llm.tools import rag_search_tool
@@ -39,60 +39,44 @@ def build_user_prompt(mode: str, log_text: str, code_text: str) -> str:
         return f"[코드]\n{code_text}"
     return f"[로그]\n{log_text}\n\n[코드]\n{code_text}"
 
-def agent_node(state: AgentState):
-
+def agent_draft(state: AgentState):
     persona = state.get("persona", "junior")
     mode = state.get("input_mode", "log")
-    
-    # 1. 페르소나에 맞는 시스템 프롬프트 로드
-    system_prompt = PROMPTS[(persona, mode)]
-    
-    # 2. 메시지 기록 관리
-    current_messages = state.get("messages", [])
-    
-    # 처음 실행 시 유저 입력 구성
-    if not current_messages:
-        user_content = build_user_prompt(
-            mode, 
-            state.get("log_text") or "", 
-            state.get("code_text") or ""
-        )
-        current_messages = [HumanMessage(content=user_content)]
+    system_prompt = PROMPTS[(persona, mode)] + "\n\n[중요] 1차 답변에서는 rag_search를 절대 호출하지 말고, 입력만으로 가능한 분석을 먼저 작성하라."
+    msgs = state.get("messages", [])
+    if not msgs:
+        user_content = build_user_prompt(mode, state.get("log_text") or "", state.get("code_text") or "")
+        msgs = [HumanMessage(content=user_content)]
+    resp = llm.invoke([SystemMessage(content=system_prompt)] + msgs)
+    return {"messages": [resp]}
 
-    # 3. 도구 사용 여부 확인 (도구를 이미 사용했다면 요약 답변 유도)
-    used_tool = any(isinstance(m, ToolMessage) for m in current_messages)
-    
-    final_system_msg = system_prompt
-    if used_tool:
-        final_system_msg += "\n\n검색된 지식을 바탕으로 최종 답변을 작성하세요. 추가 도구 호출은 중단하세요."
-    import sys
-    print("🧭 agent_node end, messages:", len(state["messages"]), file=sys.stderr, flush=True)
+def need_rag(state: AgentState) -> str:
+    # 1차 답변(초안)을 보고 “추가 근거 필요” 판단
+    last = state["messages"][-1].content.lower()
+    # 이런 표현이 있으면 RAG로 보내기 (원하는 기준으로 튜닝)
+    triggers = ["모르겠", "불확실", "추정", "추가 정보", "확인이 필요", "가능성이", "근거 부족"]
+    return "tools" if any(t in last for t in triggers) else END
 
-    # 4. LLM 호출
-    full_input = [SystemMessage(content=final_system_msg)] + current_messages
-    response = llm_with_tools.invoke(full_input)
+def agent_final(state: AgentState):
+    # tools 결과 포함해서 최종 답변 작성 (tool 사용 후니까 tool 추가 호출 중단 안내)
+    persona = state.get("persona", "junior")
+    mode = state.get("input_mode", "log")
+    system_prompt = PROMPTS[(persona, mode)] + "\n\n검색된 지식을 바탕으로 최종 답변을 작성하세요. 추가 도구 호출은 중단하세요."
+    msgs = state.get("messages", [])
+    resp = llm_with_tools.invoke([SystemMessage(content=system_prompt)] + msgs)
+    return {"messages": [resp]}
 
-    # MessagesState는 리스트를 반환하면 자동으로 합쳐짐
-    return {"messages": [response]}
 
 # 그래프 정의
 graph = StateGraph(AgentState)
-
-graph.add_node("agent", agent_node)
+graph.add_node("draft", agent_draft)
 graph.add_node("tools", tool_node)
+graph.add_node("final", agent_final)
 
-graph.add_edge(START, "agent")
-
-graph.add_conditional_edges(
-    "agent",
-    tools_condition,
-    {
-        "tools": "tools",
-        END: END,
-    },
-)
-
-graph.add_edge("tools", "agent")
+graph.add_edge(START, "draft")
+graph.add_conditional_edges("draft", need_rag, {"tools": "tools", END: END})
+graph.add_edge("tools", "final")
+graph.add_edge("final", END)
 
 app = graph.compile()
 
