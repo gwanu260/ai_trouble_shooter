@@ -58,7 +58,7 @@ jobs:
             uses: docker/build-push-action@v4
             with:
               # Dockerfile 위치
-              context: ./dev/app
+              context: ./dev
               file: ./dev/app/Dockerfile
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
@@ -67,7 +67,7 @@ jobs:
           - name: Build and Push nginx
             uses: docker/build-push-action@v4
             with:                
-              context: ./dev/nginx
+              context: ./dev
               file: ./dev/nginx/Dockerfile 
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest
@@ -75,7 +75,7 @@ jobs:
           - name: Build and Push ui
             uses: docker/build-push-action@v4
             with:                
-              context: ./dev/ui
+              context: ./dev
               file: ./dev/ui/Dockerfile
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/ui:latest
