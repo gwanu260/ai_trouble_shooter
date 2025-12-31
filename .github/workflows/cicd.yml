@@ -89,6 +89,12 @@ jobs:
           # 새로운 잡에서 새롭게 리눅스 할당 소스코드를 체크아웃함
           - name: Code Checkout
             uses: actions/checkout@v3
+
+          - name: DEBUG FILE CHECK
+            run: |
+              pwd
+              ls -al
+              find . -iname "*compose*"
         
           # 아래 파일은 소스코드를 체크아웃함으로써 획득할 수 있다.
           # AWS의 EC2에 docker-compose.yml 파일을 업로드
@@ -100,7 +106,7 @@ jobs:
               username: ${{ secrets.EC2_USERNAME }}
               key: ${{ secrets.EC2_KEY }}
               port: 22                
-              source: "docker-compose.yml"
+              source: "Docker-compose.yml"
               # /home/ubuntu/deploy/dev/docker-compose.yml 생성됨
               target: "/home/${{ secrets.EC2_USERNAME }}/deploy"
           
