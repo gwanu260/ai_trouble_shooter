@@ -138,7 +138,8 @@ jobs:
               BEDROCK_EMBEDDING_MODEL_ID=$BEDROCK_EMBEDDING_MODEL_ID
               EOF
 
+            docker-compose down
             docker-compose pull
-            docker-compose up -d --force-recreate
+            docker-compose up -d
             docker image prune -f
             docker ps -a
