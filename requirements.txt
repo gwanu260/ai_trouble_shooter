@@ -4,6 +4,7 @@ streamlit
 requests
 boto3
 python-dotenv
+pydantic
 
 langchain
 langchain-core

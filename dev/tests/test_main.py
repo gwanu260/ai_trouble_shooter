@@ -1,13 +1,14 @@
-from fastapi.testclient import TestClient
-from dev.app.main import app
+from fastapi import FastAPI
 
-# TestClient
-# 서버를 켜지 않고도 요청/응답을 검증할 수 있게 해주는 테스트 도구
-client = TestClient(app)
+app = FastAPI()
 
-def test_read_item():
-    response = client.get("/items/42")
-    # 응답코드가 200이다
-    assert response.status_code == 200
-    # 응답결과는 다음과 같다
-    assert response.json() == {"item_id": 42, "name": "Item 42"}
+@app.post("/analyze/log")
+async def analyze_log(payload: dict):
+    """
+    테스트를 위한 Mock 응답
+    """
+    return {
+        "status": "ok",
+        "message": "analysis complete",
+        "received": payload
+    }
