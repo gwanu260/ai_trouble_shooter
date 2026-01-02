@@ -7,10 +7,10 @@ import re
 import uuid
 from dotenv import load_dotenv
 
-# ✅ 환경 변수 로드 (최우선 실행)
+# 환경 변수 로드 (최우선 실행)
 load_dotenv()
 
-# ✅ 경로 자동 인식 로직
+# 경로 자동 인식 로직
 current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.abspath(os.path.join(current_dir, "../../"))
 if root_dir not in sys.path:
@@ -56,7 +56,7 @@ async def analyze_log(req: AnalyzeRequest):
             "code_text": req.code
         }
         
-        # 🔍 이 지점에서 에러가 날 확률이 높음 (LLM 호출)
+        # 이 지점에서 에러가 날 확률이 높음 (LLM 호출)
         final_state = app_graph.invoke(initial_state)
         raw_text = final_state["messages"][-1].content
 
@@ -72,7 +72,7 @@ async def analyze_log(req: AnalyzeRequest):
             "prevention": robust_extract("prevention", raw_text) or "가이드 생성 완료"
         }
     except Exception as e:
-        # ✅ 터미널에 상세 에러 출력
+        # 터미널에 상세 에러 출력
         print(f"❌ [Server Error] {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
