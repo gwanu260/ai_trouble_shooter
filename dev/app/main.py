@@ -54,12 +54,13 @@ async def analyze_log(req: AnalyzeRequest):
         # [1] 마스킹 매니저 인스턴스 생성
         masker = MaskingManager()
         
-        # [2] 입력 데이터 마스킹 및 공백 제거 (Anthropic 400 에러 방지 핵심)
-        log_content = req.error_log.strip() if req.error_log else ""
-        code_content = req.code.strip() if req.code else ""
+        # [2] 입력 데이터 정제 및 마스킹 (400 에러 방지 핵심)
+        # .strip()으로 보이지 않는 공백을 제거하고, 빈 값일 경우 "None" 텍스트를 넣어 공백 발생을 차단합니다.
+        log_content = req.error_log.strip() if req.error_log and req.error_log.strip() else "No log content provided"
+        code_content = req.code.strip() if req.code and req.code.strip() else "No code content provided"
         
-        masked_log = masker.mask(log_content)
-        masked_code = masker.mask(code_content)
+        masked_log = masker.mask(log_content).strip()
+        masked_code = masker.mask(code_content).strip()
         
         initial_state = {
             "messages": [], 
@@ -71,30 +72,29 @@ async def analyze_log(req: AnalyzeRequest):
         
         # [3] LLM 호출 (마스킹된 상태로 분석 진행)
         final_state = app_graph.invoke(initial_state)
-        # LLM 응답 자체의 앞뒤 공백도 미리 제거합니다.
         raw_text = final_state["messages"][-1].content.strip()
 
-        def robust_extract(field, text):
-            # 정규표현식으로 JSON 형태의 필드 추출
+        # [4] 응답 데이터 추출 및 언마스킹 로직 통합
+        def robust_extract_and_unmask(field, text):
+            # JSON 내의 필드를 찾기 위한 정규식
             pattern = rf'"{field}"\s*:\s*"(.*?)"(?=\s*,\s*"|\s*}}\s*$|\s*}}?\s*```|$)'
             m = re.search(pattern, text, re.DOTALL)
             if m: 
-                # 줄바꿈 및 따옴표 이스케이프 처리 후 앞뒤 공백 제거
-                extracted = m.group(1).replace('\\n', '\n').replace('\\"', '"')
-                return extracted.strip()
-            return None
+                # 추출된 값에서 이스케이프된 줄바꿈 등을 처리
+                val = m.group(1).replace('\\n', '\n').replace('\\"', '"').strip()
+                # [핵심] 추출된 결과에서 IP_ADDR_0 등을 실제 IP로 복구
+                return masker.unmask(val)
+            return f"{field} 분석 완료 (상세 내용 없음)"
 
-        # [4] 응답 데이터 복구 (언마스킹)
-        # 추출된 원시 답변들을 가져옵니다.
-        cause_raw = robust_extract("cause", raw_text) or "분석 완료"
-        sol_raw = robust_extract("solution", raw_text) or "해결책 생성 완료"
-        prev_raw = robust_extract("prevention", raw_text) or "가이드 생성 완료"
+        # 각 필드에 대해 추출과 동시에 언마스킹 수행
+        cause_final = robust_extract_and_unmask("cause", raw_text)
+        sol_final = robust_extract_and_unmask("solution", raw_text)
+        prev_final = robust_extract_and_unmask("prevention", raw_text)
 
-        # [수정 핵심] 마스킹 테이블을 이용해 실제 IP 등으로 복구하여 반환
         return {
-            "cause": masker.unmask(cause_raw),
-            "solution": masker.unmask(sol_raw),
-            "prevention": masker.unmask(prev_raw)
+            "cause": cause_final,
+            "solution": sol_final,
+            "prevention": prev_final
         }
     except Exception as e:
         # 터미널에 상세 에러 출력
