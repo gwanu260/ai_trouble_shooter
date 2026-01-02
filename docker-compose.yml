@@ -1,14 +1,42 @@
-version: "3.9"
-
 services:
   api:
-    image: g3anu/fastapi-app:latest
-    ports:
-      - "8000:8000"
+    image: ${DOCKER_USERNAME}/fastapi-app:latest
+    container_name: fastapi_app
+    restart: always
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
     env_file:
       - .env
+    ports:
+      - "8000:8000"
+    networks:
+      - my-net
 
   ui:
-    image: g3anu/ui:latest
+    image: ${DOCKER_USERNAME}/ui:latest
+    container_name: streamlit_ui
+    restart: always
+    command: streamlit run ui.py --server.address 0.0.0.0 --server.port 8501
+    env_file:
+      - .env
     ports:
       - "8501:8501"
+    depends_on:
+      - api
+    networks:
+      - my-net
+
+  nginx:
+    image: ${DOCKER_USERNAME}/nginx-proxy:latest
+    container_name: nginx_proxy
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+      - ui
+    networks:
+      - my-net
+
+networks:
+  my-net:
+    driver: bridge

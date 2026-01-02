@@ -18,7 +18,7 @@ LangGraph Agent에서 사용하는 외부 Tool 정의 모듈.
 import os
 from dotenv import load_dotenv
 load_dotenv()
-
+import sys
 from langchain_aws import BedrockEmbeddings
 from pinecone import Pinecone
 from langchain_core.tools import tool
@@ -104,4 +104,5 @@ def rag_search_tool(query: str) -> str:
     Pinecone 벡터 DB에서 관련 트러블슈팅 지식을 검색한다.
     """
     print("[TOOL CALLED] rag_search:", query[:80])
+    print("🛠️ TOOL ENTERED:", query, file=sys.stderr, flush=True)
     return rag_search(query, top_k=5)
