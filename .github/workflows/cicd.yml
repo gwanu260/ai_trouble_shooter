@@ -2,7 +2,7 @@ name: AI Trouble Shooter CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "advanced_dev" ]
 
 jobs:
   build-and-deploy:
@@ -51,7 +51,7 @@ jobs:
         script: |
           cd ~/deploy
 
-          
+
           docker-compose down
           docker-compose pull
           docker-compose up -d
