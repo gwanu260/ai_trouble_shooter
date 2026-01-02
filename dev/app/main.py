@@ -55,7 +55,6 @@ async def analyze_log(req: AnalyzeRequest):
         masker = MaskingManager()
         
         # [2] 입력 데이터 마스킹 및 공백 제거 (Anthropic 400 에러 방지 핵심)
-        # .strip()을 사용하여 텍스트 끝에 남은 보이지 않는 공백을 제거합니다.
         log_content = req.error_log.strip() if req.error_log else ""
         code_content = req.code.strip() if req.code else ""
         
@@ -91,7 +90,7 @@ async def analyze_log(req: AnalyzeRequest):
         sol_raw = robust_extract("solution", raw_text) or "해결책 생성 완료"
         prev_raw = robust_extract("prevention", raw_text) or "가이드 생성 완료"
 
-        # 마스킹 테이블을 이용해 실제 IP 등으로 복구하여 반환
+        # [수정 핵심] 마스킹 테이블을 이용해 실제 IP 등으로 복구하여 반환
         return {
             "cause": masker.unmask(cause_raw),
             "solution": masker.unmask(sol_raw),
