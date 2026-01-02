@@ -30,7 +30,7 @@ def ag_module(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-key")
     
     # 경로에 맞춰 import (현재 구조 반영)
-    from dev.llm import agent_with_graph as ag
+    from dev.app.llm import agent_with_graph as ag
     ag = importlib.reload(ag)
     return ag
 

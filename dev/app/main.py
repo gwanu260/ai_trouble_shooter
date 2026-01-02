@@ -17,8 +17,8 @@ if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
 try:
-    from dev.llm.agent_with_graph import app as app_graph
-    from dev.llm.tools import get_embedder, get_pinecone_index
+    from dev.app.llm.agent_with_graph import app as app_graph
+    from dev.app.llm.tools import get_embedder, get_pinecone_index
 except ImportError as e:
     print(f"❌ Import Error: {e}")
     raise
