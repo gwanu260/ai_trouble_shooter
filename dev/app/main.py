@@ -1,16 +1,16 @@
 import sys
 import os
+import re
+import uuid
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Literal
-import re
-import uuid
 from dotenv import load_dotenv
 
-# [추가] 가역적 마스킹 매니저 임포트
+# 가역적 마스킹 매니저 임포트
 from dev.app.masking import MaskingManager
 
-# 환경 변수 로드 (최우선 실행)
+# 환경 변수 로드
 load_dotenv()
 
 # 경로 자동 인식 로직
@@ -51,11 +51,9 @@ async def analyze_log(req: AnalyzeRequest):
     try:
         print(f"🚀 분석 요청 수신: {req.input_mode} 모드")
         
-        # [1] 마스킹 매니저 인스턴스 생성
         masker = MaskingManager()
         
-        # [2] 입력 데이터 정제 및 마스킹 (400 에러 방지 핵심)
-        # .strip()으로 보이지 않는 공백을 제거하고, 빈 값일 경우 "None" 텍스트를 넣어 공백 발생을 차단합니다.
+        # 1. 입력 데이터 정제 및 마스킹
         log_content = req.error_log.strip() if req.error_log and req.error_log.strip() else "No log content provided"
         code_content = req.code.strip() if req.code and req.code.strip() else "No code content provided"
         
@@ -66,38 +64,60 @@ async def analyze_log(req: AnalyzeRequest):
             "messages": [], 
             "persona": req.persona,
             "input_mode": req.input_mode,
-            "log_text": masked_log,   # 마스킹된 로그 전달
-            "code_text": masked_code  # 마스킹된 코드 전달
+            "log_text": masked_log,
+            "code_text": masked_code
         }
         
-        # [3] LLM 호출 (마스킹된 상태로 분석 진행)
+        # 2. LLM 호출
         final_state = app_graph.invoke(initial_state)
         raw_text = final_state["messages"][-1].content.strip()
 
-        # [4] 응답 데이터 추출 및 언마스킹 로직 통합
+        # 3. [강화된 추출 로직] 상세 내용을 끝까지 긁어오고 동시에 언마스킹 수행
         def robust_extract_and_unmask(field, text):
-            # JSON 내의 필드를 찾기 위한 정규식
-            pattern = rf'"{field}"\s*:\s*"(.*?)"(?=\s*,\s*"|\s*}}\s*$|\s*}}?\s*```|$)'
-            m = re.search(pattern, text, re.DOTALL)
-            if m: 
-                # 추출된 값에서 이스케이프된 줄바꿈 등을 처리
-                val = m.group(1).replace('\\n', '\n').replace('\\"', '"').strip()
-                # [핵심] 추출된 결과에서 IP_ADDR_0 등을 실제 IP로 복구
-                return masker.unmask(val)
-            return f"{field} 분석 완료 (상세 내용 없음)"
+            # JSON 스타일 ("field": "value") 뿐만 아니라 마크다운 스타일까지 모두 대응하는 패턴 리스트
+            patterns = [
+                rf'"{field}"\s*:\s*"(.*?)"(?=\s*,\s*"|\s*}}\s*$|\s*}}?\s*```|$)', # 표준 JSON
+                rf'"{field}"\s*:\s*(.*?)(?=\n\s*"\w+"|$)', # 따옴표가 없는 값
+                rf'\*\*{field}\*\*[:\s]+(.*?)(?=\n\*\*|$)', # 마크다운 (**cause**: 내용)
+                rf'{field}[:\s]+(.*?)(?=\n\w+[:\s]|$)' # 일반 텍스트 (cause: 내용)
+            ]
+            
+            extracted = None
+            for pattern in patterns:
+                m = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+                if m:
+                    extracted = m.group(1).strip()
+                    break
+            
+            if extracted:
+                # 불필요한 따옴표, 이스케이프 제거 및 언마스킹
+                clean_text = extracted.strip('"').replace('\\n', '\n').replace('\\"', '"').strip()
+                return masker.unmask(clean_text)
+            
+            # 최후의 수단: 문자열 인덱스로 직접 찾기
+            try:
+                search_key = f'"{field}"'
+                if search_key in text:
+                    start_idx = text.find(search_key) + len(search_key)
+                    # 콜론(:)과 따옴표(") 건너뛰기
+                    after_key = text[start_idx:].lstrip(' :\"')
+                    # 다음 필드 구분자( ", )나 종료 기호( "} ) 전까지 잘라냄
+                    end_pos = re.search(r'["\s]*[,}]', after_key)
+                    if end_pos:
+                        return masker.unmask(after_key[:end_pos.start()].strip())
+            except:
+                pass
 
-        # 각 필드에 대해 추출과 동시에 언마스킹 수행
-        cause_final = robust_extract_and_unmask("cause", raw_text)
-        sol_final = robust_extract_and_unmask("solution", raw_text)
-        prev_final = robust_extract_and_unmask("prevention", raw_text)
+            return f"{field} 분석 정보 추출 실패 (LLM 응답 형식 확인 필요)"
 
+        # 각 필드별로 데이터 추출 실행
         return {
-            "cause": cause_final,
-            "solution": sol_final,
-            "prevention": prev_final
+            "cause": robust_extract_and_unmask("cause", raw_text),
+            "solution": robust_extract_and_unmask("solution", raw_text),
+            "prevention": robust_extract_and_unmask("prevention", raw_text)
         }
+
     except Exception as e:
-        # 터미널에 상세 에러 출력
         print(f"❌ [Server Error] {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
