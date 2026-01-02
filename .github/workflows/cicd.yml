@@ -2,7 +2,7 @@ name: AI Trouble Shooter CI/CD
 
 on:
   push:
-    branches: [ "main", "final_process" ]
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 

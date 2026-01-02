@@ -54,10 +54,13 @@ async def analyze_log(req: AnalyzeRequest):
         # [1] 마스킹 매니저 인스턴스 생성
         masker = MaskingManager()
         
-        # [2] 입력 데이터 마스킹 (보안 처리)
-        # 외부 LLM으로 넘어가기 전 민감 정보를 가짜 ID로 치환합니다.
-        masked_log = masker.mask(req.error_log) if req.error_log else ""
-        masked_code = masker.mask(req.code) if req.code else ""
+        # [2] 입력 데이터 마스킹 및 공백 제거 (Anthropic 400 에러 방지 핵심)
+        # .strip()을 사용하여 텍스트 끝에 남은 보이지 않는 공백을 제거합니다.
+        log_content = req.error_log.strip() if req.error_log else ""
+        code_content = req.code.strip() if req.code else ""
+        
+        masked_log = masker.mask(log_content)
+        masked_code = masker.mask(code_content)
         
         initial_state = {
             "messages": [], 
@@ -69,26 +72,33 @@ async def analyze_log(req: AnalyzeRequest):
         
         # [3] LLM 호출 (마스킹된 상태로 분석 진행)
         final_state = app_graph.invoke(initial_state)
-        raw_text = final_state["messages"][-1].content
+        # LLM 응답 자체의 앞뒤 공백도 미리 제거합니다.
+        raw_text = final_state["messages"][-1].content.strip()
 
         def robust_extract(field, text):
+            # 정규표현식으로 JSON 형태의 필드 추출
             pattern = rf'"{field}"\s*:\s*"(.*?)"(?=\s*,\s*"|\s*}}\s*$|\s*}}?\s*```|$)'
             m = re.search(pattern, text, re.DOTALL)
-            if m: return m.group(1).replace('\\n', '\n').replace('\\"', '"').strip()
+            if m: 
+                # 줄바꿈 및 따옴표 이스케이프 처리 후 앞뒤 공백 제거
+                extracted = m.group(1).replace('\\n', '\n').replace('\\"', '"')
+                return extracted.strip()
             return None
 
         # [4] 응답 데이터 복구 (언마스킹)
-        # LLM이 답변에 사용한 가짜 ID들을 다시 실제 정보로 복구합니다.
+        # 추출된 원시 답변들을 가져옵니다.
         cause_raw = robust_extract("cause", raw_text) or "분석 완료"
         sol_raw = robust_extract("solution", raw_text) or "해결책 생성 완료"
         prev_raw = robust_extract("prevention", raw_text) or "가이드 생성 완료"
 
+        # 마스킹 테이블을 이용해 실제 IP 등으로 복구하여 반환
         return {
             "cause": masker.unmask(cause_raw),
             "solution": masker.unmask(sol_raw),
             "prevention": masker.unmask(prev_raw)
         }
     except Exception as e:
+        # 터미널에 상세 에러 출력
         print(f"❌ [Server Error] {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
