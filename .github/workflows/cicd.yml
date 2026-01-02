@@ -22,7 +22,7 @@ jobs:
     # ---------- Build & Push FastAPI ----------
     - name: Build & Push FastAPI
       run: |
-        docker build -t g3anu/fastapi-app:latest ./app
+        docker build -t g3anu/fastapi-app:latest ./main
         docker push g3anu/fastapi-app:latest
 
     # ---------- Build & Push UI ----------
