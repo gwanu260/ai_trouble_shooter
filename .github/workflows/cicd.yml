@@ -48,12 +48,14 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Build and Push Images
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest ./dev/app
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest ./dev/nginx
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/ui:latest ./dev/ui
+          # 빌드 컨텍스트를 루트(.)로 지정하여 상위 폴더 참조 가능하게 함
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest -f dev/app/Dockerfile .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/ui:latest -f dev/ui/Dockerfile .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest -f dev/nginx/Dockerfile .
+          
           docker push ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/ui:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest
 
   EC2-deploy:
     needs: docker-build-deploy
@@ -94,7 +96,6 @@ jobs:
             echo "PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}" >> .env
             echo "PINECONE_NAMESPACE=${{ secrets.PINECONE_NAMESPACE }}" >> .env
 
-            # [핵심 수정] docker 앞에 sudo를 붙여 권한 문제를 해결합니다.
             if [ -f "docker-compose.yml" ]; then
               sudo docker compose pull
               sudo docker compose up -d

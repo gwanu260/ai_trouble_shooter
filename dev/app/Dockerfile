@@ -1,15 +1,20 @@
 # 1. 기본 이미지
 FROM python:3.12.0-slim
 
-# 2. 작업디렉터리 -> 루트디렉토리가 설정됨
+# 2. 작업 디렉토리 설정
 WORKDIR /app
 
-# 3. requirements.txt 복사 및 설치
-COPY requirements.txt .
+# 3. 루트 기준으로 의존성 파일 복사 및 설치
+# 빌드 컨텍스트가 루트이므로 dev/app/ 경로를 명시합니다.
+COPY dev/app/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
-&& pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir -r requirements.txt
 
-# 4. 코드복사 -> requirements.txt는 이미 복사되어 있음
+# 4. 프로젝트 전체 코드 복사 (dev/llm 모듈 참조를 위해 필수)
 COPY . .
 
-# 5. 백그라운드(데몬)으로 서비스 가동 -> 컴포즈에서 대체되었음
+# 5. 환경 변수 설정: /app을 파이썬 모듈 검색 경로에 추가
+ENV PYTHONPATH=/app
+
+# 6. 실행 명령: 모듈 경로를 포함하여 실행
+CMD ["uvicorn", "dev.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
