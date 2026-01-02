@@ -13,8 +13,6 @@ def get_api_base_url():
 
 API_BASE_URL = get_api_base_url()
 
-API_BASE_URL = "http://localhost:8000"
-
 st.set_page_config(page_title="🔍 AI Trouble Shooter", layout="wide")
 
 st.markdown("## 🔍 AI Trouble Shooter — Code Analyzer")

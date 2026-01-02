@@ -12,7 +12,7 @@ services:
       - my-net
 
   ui:
-    image: ${DOCKER_USERNAME}/fastapi-app:latest
+    image: ${DOCKER_USERNAME}/ui:latest
     container_name: streamlit_ui
     restart: always
     command: streamlit run ui.py --server.address 0.0.0.0 --server.port 8501
