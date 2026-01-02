@@ -11,14 +11,13 @@ st.markdown("---")
 with st.sidebar:
     st.title("⚙️ 설정")
     level = st.selectbox("사용자 레벨", ["주니어", "시니어"], index=0)
-    language = st.selectbox("언어", ["python", "C", "javascript"], index=0)
 
-st.markdown("#### 🧩 분석 입력")
+st.markdown("##### 혼자 해결하기 막막한 에러가 있나요? 여기 로그나 코드를 남겨주시면 최적의 해결 방안을 제안해드릴게요!")
 col_log, col_code = st.columns(2)
 with col_log:
-    input_log = st.text_area("🐞 에러 로그 입력", height=250)
+    input_log = st.text_area("🐞 로그 입력", height=250)
 with col_code:
-    input_code = st.text_area("💡 코드 스니펫 입력", height=250)
+    input_code = st.text_area("💡 코드 입력", height=250)
 
 _, center_btn, _ = st.columns([4, 2, 4])
 with center_btn:
@@ -52,15 +51,37 @@ if analyze_clicked:
             except Exception as e:
                 st.error(f"연결 오류: {e}")
 
-# ---------- 결과 표시 및 저장 버튼 ---------- #
+# 결과 표시 및 저장 버튼
 if st.session_state.analysis_result:
     result = st.session_state.analysis_result
     st.success(f"🎯 {level} 모드 분석 완료!")
     
-    col_c, col_s, col_p = st.columns(3)
-    col_c.info(f"### 🔴 원인\n{result.get('cause')}")
-    col_s.success(f"### 🔵 해결\n{result.get('solution')}")
-    col_p.warning(f"### 🟢 재발 방지\n{result.get('prevention')}")
+    # 특정 문구("가이드 생성 완료") 
+    p_text = result.get('prevention', "").strip()
+    
+    # "없습니다"가 포함되어 있거나, "가이드 생성 완료"와 일치하면 숨김 처리(False)
+    # 두 조건을 모두 검사하여 더 확실하게 숨깁니다.
+    is_prevention_valid = (
+        p_text 
+        and "없습니다" not in p_text 
+        and p_text != "가이드 생성 완료"
+    )
+    
+    # 유효한 예방 가이드가 있을 때만 3개 컬럼, 없으면 2개 컬럼 생성
+    if is_prevention_valid:
+        cols = st.columns(3)
+    else:
+        cols = st.columns(2)
+
+    with cols[0]:
+        st.info(f"### 🔴 원인\n{result.get('cause')}")
+    with cols[1]:
+        st.success(f"### 🔵 해결\n{result.get('solution')}")
+    
+    # 예방 가이드가 유효할 때만 세 번째 컬럼 표시
+    if is_prevention_valid:
+        with cols[2]:
+            st.warning(f"### 🟢 재발 방지\n{p_text}")
     
     st.markdown("---")
     st.markdown("#### 💡 이 답변이 유용했나요?")
