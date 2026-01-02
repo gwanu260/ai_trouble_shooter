@@ -57,7 +57,7 @@ if analyze_clicked:
                     st.session_state.analysis_result = res.json()
                     st.session_state.last_inputs = payload # 저장 시 사용하기 위해 보관
                 else:
-                    st.error("분석 실패")
+                    st.error("분석 실패:정확한 로그나 코드를 입력해주세요!")
             except Exception as e:
                 st.error(f"연결 오류: {e}")
 
