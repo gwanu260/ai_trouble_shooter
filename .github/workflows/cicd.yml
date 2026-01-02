@@ -68,7 +68,7 @@ jobs:
           context: ./dev/ui
           file: ./dev/ui/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME}/ui:latest
+          tags: ${{secrets.DOCKER_USERNAME}}/ui:latest
 
   EC2-deploy:
     needs: docker-build-deploy
