@@ -20,16 +20,22 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        # 폴더 구조에 맞춰 경로 수정 가능 (예: ./dev/app/requirements.txt)
+        # 폴더 구조에 맞춰 경로 확인 후 설치
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         if [ -f dev/app/requirements.txt ]; then pip install -r dev/app/requirements.txt; fi
+        if [ -f dev/llm/requirements.txt ]; then pip install -r dev/llm/requirements.txt; fi
 
     - name: Run Tests
       env:
         PYTHONPATH: .
-        # [수정] 테스트 시 필요한 최소한의 환경 변수 주입
+        # [중요] Pydantic ValidationError 해결을 위한 환경 변수 주입
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        ANTHROPIC_MODEL_ID: ${{ secrets.ANTHROPIC_MODEL_ID }}
         AWS_REGION: ${{ secrets.AWS_REGION }}
+        # 추가 에러 방지를 위해 미리 넣어두는 변수들
+        PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+        PINECONE_INDEX: ${{ secrets.PINECONE_INDEX }}
+        PINECONE_NAMESPACE: ${{ secrets.PINECONE_NAMESPACE }}
       run: |
         pytest dev/tests/ -vv
 
@@ -68,7 +74,7 @@ jobs:
           context: ./dev/ui
           file: ./dev/ui/Dockerfile
           push: true
-          tags: ${{secrets.DOCKER_USERNAME}}/ui:latest
+          tags: ${{ secrets.DOCKER_USERNAME }}/ui:latest
 
   EC2-deploy:
     needs: docker-build-deploy
@@ -84,7 +90,6 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_KEY }}
           port: 22
-          # [수정] 실제 루트에 있는 파일 경로로 수정
           source: "docker-compose.yml"
           target: "/home/${{ secrets.EC2_USERNAME }}/deploy"
 
@@ -99,17 +104,18 @@ jobs:
             mkdir -p ~/deploy
             cd ~/deploy
             
-            # .env 파일 생성 로직 (기존 유지)
+            # .env 파일 자동 생성
             echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" > .env
             echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> .env
             echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
             echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
             echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> .env
+            echo "ANTHROPIC_MODEL_ID=${{ secrets.ANTHROPIC_MODEL_ID }}" >> .env
             echo "PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}" >> .env
             echo "PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}" >> .env
             echo "PINECONE_NAMESPACE=${{ secrets.PINECONE_NAMESPACE }}" >> .env
 
-            # 최신 이미지 반영 및 실행
+            # 도커 서비스 갱신
             docker compose pull
             docker compose up -d
             docker image prune -f
