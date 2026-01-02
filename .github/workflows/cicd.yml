@@ -61,7 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # [추가] 1. docker-compose.yml 파일을 EC2로 전송하는 단계
+      # 1. 파일 전송 단계 (대소문자 구분 없이 파일을 찾도록 설정 보강)
       - name: Copy docker-compose.yml to EC2
         uses: appleboy/scp-action@master
         with:
@@ -69,10 +69,11 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_KEY }}
           port: 22
-          source: "docker-compose.yml"
+          source: "[Dd]ocker-compose.yml"
           target: "/home/${{ secrets.EC2_USERNAME }}/deploy"
+          strip_components: 0
 
-      # 2. SSH 접속 후 명령 실행
+      # 2. SSH 접속 후 배포 명령 실행
       - name: Deploy via SSH
         uses: appleboy/ssh-action@master
         with:
@@ -81,8 +82,11 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           port: 22
           script: |
-            # 작업 디렉토리 생성 및 이동
+            # 폴더 이동
             mkdir -p ~/deploy && cd ~/deploy
+            
+            # 파일명이 대문자로 전송되었을 경우 소문자로 통일 (Docker 인식용)
+            mv Docker-compose.yml docker-compose.yml 2>/dev/null || true
             
             # .env 파일 생성
             echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" > .env
@@ -96,13 +100,13 @@ jobs:
             echo "PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}" >> .env
             echo "PINECONE_NAMESPACE=${{ secrets.PINECONE_NAMESPACE }}" >> .env
 
-            # 최신 이미지 풀링 및 컨테이너 재시작
-            # 파일이 전송되었는지 확인 후 실행
+            # 최신 이미지 반영 및 실행
             if [ -f "docker-compose.yml" ]; then
               docker compose pull
               docker compose up -d
               docker image prune -f
             else
-              echo "Error: docker-compose.yml not found in ~/deploy"
+              echo "Error: docker-compose.yml not found."
+              ls -al # 파일 목록을 출력하여 디버깅 지원
               exit 1
             fi
