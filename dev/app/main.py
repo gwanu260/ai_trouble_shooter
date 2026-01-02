@@ -72,15 +72,32 @@ async def analyze_log(req: AnalyzeRequest):
         
         # 2. LLM 호출
         final_state = app_graph.invoke(initial_state)
-        raw_text = final_state["messages"][-1].content.strip()
+        
+        # [수정] 리스트 형태의 content 에러 해결 로직
+        response_content = final_state["messages"][-1].content
+        if isinstance(response_content, list):
+            raw_text = ""
+            for block in response_content:
+                if isinstance(block, dict) and "text" in block:
+                    raw_text += block["text"]
+                elif hasattr(block, "text"):
+                    raw_text += block.text
+                else:
+                    raw_text += str(block)
+        else:
+            raw_text = str(response_content).strip()
 
-        # 터미널에서 LLM의 실제 답변을 확인하기 위한 로그 (디버깅용)
+        # 터미널에서 LLM의 실제 답변을 확인하기 위한 로그
         print("\n" + "="*30 + " [LLM RESPONSE] " + "="*30)
         print(raw_text)
         print("="*76 + "\n")
 
         # 3. 공격적 추출 및 언마스킹 함수
         def robust_extract_and_unmask(field, text):
+            # 문자열 안전 장치
+            if not isinstance(text, str):
+                text = str(text)
+                
             # 패턴 1: 표준 JSON 또는 마크다운 형식
             patterns = [
                 rf'"{field}"\s*:\s*"(.*?)"(?=\s*,\s*"|\s*}}\s*$|\s*}}?\s*```|$)',
@@ -93,7 +110,7 @@ async def analyze_log(req: AnalyzeRequest):
                 m = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
                 if m:
                     val = m.group(1).strip().strip('"').replace('\\n', '\n').replace('\\"', '"')
-                    if len(val) > 2: # 의미 있는 길이일 때만 반환
+                    if len(val) > 2:
                         return masker.unmask(val)
             
             # 패턴 2: 키워드 기반 강제 슬라이싱 (패턴 매칭 실패 시)
@@ -102,9 +119,7 @@ async def analyze_log(req: AnalyzeRequest):
                 field_lower = field.lower()
                 if field_lower in lower_text:
                     idx = lower_text.find(field_lower) + len(field_lower)
-                    # 다음 주요 키워드가 나오기 전까지 긁어오기
                     sub = text[idx:].lstrip(' :"\n')
-                    # 다른 필드 이름이 나오면 거기서 멈춤
                     stop_words = ["solution", "prevention", "cause", "원인", "해결", "방지"]
                     end_idx = len(sub)
                     for word in stop_words:
@@ -118,7 +133,7 @@ async def analyze_log(req: AnalyzeRequest):
             except:
                 pass
 
-            return f"[{field}] 분석 내용을 추출할 수 없습니다. 로그를 확인하세요."
+            return f"[{field}] 분석 내용을 추출할 수 없습니다."
 
         return {
             "cause": robust_extract_and_unmask("cause", raw_text),
