@@ -61,7 +61,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # 1. 파일 전송 단계 (대소문자 구분 없이 파일을 찾도록 설정 보강)
       - name: Copy docker-compose.yml to EC2
         uses: appleboy/scp-action@master
         with:
@@ -73,7 +72,6 @@ jobs:
           target: "/home/${{ secrets.EC2_USERNAME }}/deploy"
           strip_components: 0
 
-      # 2. SSH 접속 후 배포 명령 실행
       - name: Deploy via SSH
         uses: appleboy/ssh-action@master
         with:
@@ -82,13 +80,9 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           port: 22
           script: |
-            # 폴더 이동
             mkdir -p ~/deploy && cd ~/deploy
-            
-            # 파일명이 대문자로 전송되었을 경우 소문자로 통일 (Docker 인식용)
             mv Docker-compose.yml docker-compose.yml 2>/dev/null || true
             
-            # .env 파일 생성
             echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" > .env
             echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> .env
             echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
@@ -100,13 +94,13 @@ jobs:
             echo "PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}" >> .env
             echo "PINECONE_NAMESPACE=${{ secrets.PINECONE_NAMESPACE }}" >> .env
 
-            # 최신 이미지 반영 및 실행
+            # [핵심 수정] docker 앞에 sudo를 붙여 권한 문제를 해결합니다.
             if [ -f "docker-compose.yml" ]; then
-              docker compose pull
-              docker compose up -d
-              docker image prune -f
+              sudo docker compose pull
+              sudo docker compose up -d
+              sudo docker image prune -f
             else
               echo "Error: docker-compose.yml not found."
-              ls -al # 파일 목록을 출력하여 디버깅 지원
+              ls -al
               exit 1
             fi
