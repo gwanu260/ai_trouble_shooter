@@ -7,8 +7,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage, AI
 from langchain_anthropic import ChatAnthropic
 from dev.app.llm.prompts import PROMPTS
 from dev.app.llm.tools import rag_search_tool
-# from prompts import PROMPTS
-# from tools import rag_search_tool
+
 load_dotenv()
 
 # LLM 설정
@@ -31,41 +30,68 @@ llm_with_tools = llm.bind_tools(tools)
 tool_node = ToolNode(tools)
 
 def build_user_prompt(mode: str, log_text: str, code_text: str) -> str:
-    log_text = log_text or ""
-    code_text = code_text or ""
+    # 텍스트가 있을 경우 양끝 공백을 먼저 제거합니다.
+    log_text = (log_text or "").strip()
+    code_text = (code_text or "").strip()
+    
     if mode == "log":
-        return f"[로그]\n{log_text}"
-    if mode == "code":
-        return f"[코드]\n{code_text}"
-    return f"[로그]\n{log_text}\n\n[코드]\n{code_text}"
+        content = f"[로그]\n{log_text}"
+    elif mode == "code":
+        content = f"[코드]\n{code_text}"
+    else:
+        content = f"[로그]\n{log_text}\n\n[코드]\n{code_text}"
+    
+    return content.strip()
 
 def agent_draft(state: AgentState):
     persona = state.get("persona", "junior")
     mode = state.get("input_mode", "log")
-    system_prompt = PROMPTS[(persona, mode)] + "\n\n[중요] 1차 답변에서는 rag_search를 절대 호출하지 말고, 입력만으로 가능한 분석을 먼저 작성하라."
+    
+    # 시스템 프롬프트 조립 시 줄바꿈 뒤에 공백이 생기지 않도록 strip()
+    base_prompt = PROMPTS.get((persona, mode), "분석가 페르소나로 동작하세요.")
+    system_prompt = (base_prompt + "\n\n[중요] 1차 답변에서는 rag_search를 절대 호출하지 말고, 입력만으로 가능한 분석을 먼저 작성하라.").strip()
+    
     msgs = state.get("messages", [])
     if not msgs:
         user_content = build_user_prompt(mode, state.get("log_text") or "", state.get("code_text") or "")
         msgs = [HumanMessage(content=user_content)]
-    resp = llm.invoke([SystemMessage(content=system_prompt)] + msgs)
+    
+    # [핵심] Anthropic 400 에러 방지: 모든 메시지의 끝 공백 강제 제거
+    formatted_msgs = [SystemMessage(content=system_prompt)] + msgs
+    for m in formatted_msgs:
+        if hasattr(m, "content") and isinstance(m.content, str):
+            m.content = m.content.strip()
+
+    resp = llm.invoke(formatted_msgs)
     return {"messages": [resp]}
 
 def need_rag(state: AgentState) -> str:
-    # 1차 답변(초안)을 보고 “추가 근거 필요” 판단
-    last = state["messages"][-1].content.lower()
-    # 이런 표현이 있으면 RAG로 보내기 (원하는 기준으로 튜닝)
+    # 1차 답변을 보고 RAG 호출 여부 판단
+    last_content = state["messages"][-1].content
+    if not last_content:
+        return END
+    
+    last = last_content.lower()
     triggers = ["모르겠", "불확실", "추정", "추가 정보", "확인이 필요", "가능성이", "근거 부족"]
     return "tools" if any(t in last for t in triggers) else END
 
 def agent_final(state: AgentState):
-    # tools 결과 포함해서 최종 답변 작성 (tool 사용 후니까 tool 추가 호출 중단 안내)
     persona = state.get("persona", "junior")
     mode = state.get("input_mode", "log")
-    system_prompt = PROMPTS[(persona, mode)] + "\n\n검색된 지식을 바탕으로 최종 답변을 작성하세요. 추가 도구 호출은 중단하세요."
+    
+    base_prompt = PROMPTS.get((persona, mode), "분석가 페르소나로 동작하세요.")
+    system_prompt = (base_prompt + "\n\n검색된 지식을 바탕으로 최종 답변을 작성하세요. 추가 도구 호출은 중단하세요.").strip()
+    
     msgs = state.get("messages", [])
-    resp = llm_with_tools.invoke([SystemMessage(content=system_prompt)] + msgs)
-    return {"messages": [resp]}
+    
+    # 모든 메시지의 content에서 trailing whitespace 제거
+    formatted_msgs = [SystemMessage(content=system_prompt)] + msgs
+    for m in formatted_msgs:
+        if hasattr(m, "content") and isinstance(m.content, str):
+            m.content = m.content.strip()
 
+    resp = llm_with_tools.invoke(formatted_msgs)
+    return {"messages": [resp]}
 
 # 그래프 정의
 graph = StateGraph(AgentState)
@@ -80,27 +106,27 @@ graph.add_edge("final", END)
 
 app = graph.compile()
 
-
 if __name__ == "__main__":
-    test_state = {
-        "messages": [],  # agent_node에서 System/Human 새로 만들어 호출하니 빈 리스트 OK
-        "persona": "junior",
-        "input_mode": "log",
-        "log_text": """
-                    Uncaught ReferenceError: count is not defined
-                    at increment (main.js:10:14)
-                    at HTMLButtonElement.onclick (index.html:25:32)
-                    function showUserName(user) {
-                    console.log(user.name); // user가 undefined
+    # 테스트 시에도 불필요한 공백이 포함되지 않도록 strip() 적용
+    test_log = """
+Uncaught ReferenceError: count is not defined
+at increment (main.js:10:14)
+at HTMLButtonElement.onclick (index.html:25:32)
+function showUserName(user) {
+    console.log(user.name); 
 }
 showUserName();
-        
-        
-        
-        """,
+""".strip()
+
+    test_state = {
+        "messages": [],
+        "persona": "junior",
+        "input_mode": "log",
+        "log_text": test_log,
         "code_text": ""
     }
 
     out = app.invoke(test_state)
     print("\n=== OUTPUT ===")
-    print(out["messages"][-1].content)
+    if out["messages"]:
+        print(out["messages"][-1].content)
