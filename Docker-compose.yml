@@ -1,28 +1,12 @@
 services:
   api:
-    image: gwanu/fastapi-app:latest
-    container_name: fastapi_app
-    restart: always
-    env_file:
-      - .env
+    image: g3anu/fastapi-app:latest
     ports:
       - "8000:8000"
-    networks:
-      - my-net
+    env_file:
+      - .env
 
   ui:
     image: g3anu/ui:latest
-    container_name: streamlit_ui
-    restart: always
-    env_file:
-      - .env
     ports:
       - "8501:8501"
-    depends_on:
-      - api
-    networks:
-      - my-net
-
-networks:
-  my-net:
-    driver: bridge
