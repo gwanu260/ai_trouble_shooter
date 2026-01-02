@@ -1,5 +1,17 @@
 import streamlit as st
 import requests
+import socket  # [추가] 네트워크 환경 체크용
+
+def get_api_base_url():
+    try:
+        # 'api'라는 이름으로 호스트 해석이 가능한지 확인 (도커 네트워크 환경)
+        socket.gethostbyname('api')
+        return "http://api:8000"
+    except socket.gaierror:
+        # 해석이 안 되면 로컬 환경임
+        return "http://localhost:8000"
+
+API_BASE_URL = get_api_base_url()
 
 API_BASE_URL = "http://localhost:8000"
 

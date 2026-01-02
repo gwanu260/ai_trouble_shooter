@@ -2,4 +2,4 @@
 # -> 자동구등(그렇게 만들어진 이미지)
 FROM nginx:alpine
 # web.conf를 /etc/nginx/conf.d/default.conf에 복사
-COPY dev/nginx/web.conf /etc/nginx/conf.d/default.conf
+COPY /web.conf /etc/nginx/conf.d/default.conf
