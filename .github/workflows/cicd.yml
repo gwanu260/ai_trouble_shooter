@@ -127,6 +127,7 @@ jobs:
                 # ===============================
                 # 컨테이너 배포
                 # ===============================
+                cd deploy
                 mv Docker-compose.yml docker-compose.yml
                 docker-compose down
                 docker-compose pull
