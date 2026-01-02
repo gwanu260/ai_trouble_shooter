@@ -60,12 +60,6 @@ async def analyze_log(req: AnalyzeRequest):
         masked_log = masker.mask(log_content).strip()
         masked_code = masker.mask(code_content).strip()
 
-        print("\n" + "="*50)
-        print("🔒 [보안 확인] LLM으로 전송되는 마스킹된 데이터")
-        print(f"📡 Masked Log: {masked_log[:200]}{'...' if len(masked_log) > 200 else ''}")
-        print(f"💻 Masked Code: {masked_code[:200]}{'...' if len(masked_code) > 200 else ''}")
-        print("="*50 + "\n")
-
         initial_state = {
             "messages": [], 
             "persona": req.persona,
