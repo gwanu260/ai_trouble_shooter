@@ -7,7 +7,7 @@ import re
 import uuid
 from dotenv import load_dotenv
 
-# 환경 변수 로드(최우선 실행)
+# 환경 변수 로드 (최우선 실행)
 load_dotenv()
 
 # 경로 자동 인식 로직
