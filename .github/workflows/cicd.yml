@@ -89,7 +89,7 @@ jobs:
               username: ${{ secrets.EC2_USERNAME }}
               key: ${{ secrets.EC2_KEY }}
               port: 22                
-              source: "./deploy/docker-compose.yml"
+              source: "Docker-compose.yml"
               # /home/ubuntu/deploy/dev/docker-compose.yml 생성됨
               target: "/home/${{ secrets.EC2_USERNAME }}/deploy"
           
@@ -127,6 +127,7 @@ jobs:
                 # ===============================
                 # 컨테이너 배포
                 # ===============================
+                mv Docker-compose.yml docker-compose.yml
                 docker-compose down
                 docker-compose pull
                 docker-compose up -d
