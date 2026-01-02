@@ -58,25 +58,16 @@ jobs:
             uses: docker/build-push-action@v4
             with:
               # Dockerfile 위치
-              context: ./dev/
-              file: ./dev/app/Dockerfile
+              context: ./app
+              file: ./app/Dockerfile
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
-
-          # 커스텀된 nginx 이미지 생성 및 도커허브 푸시 v4~v6
-          - name: Build and Push nginx
-            uses: docker/build-push-action@v4
-            with:                
-              context: ./dev
-              file: ./dev/nginx/Dockerfile 
-              push: true
-              tags: ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest
 
           - name: Build and Push ui
             uses: docker/build-push-action@v4
             with:                
-              context: ./dev
-              file: ./dev/ui/Dockerfile
+              context: ./ui
+              file: ./ui/Dockerfile
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/ui:latest
 
