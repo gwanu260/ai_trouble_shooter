@@ -43,7 +43,7 @@ jobs:
           - name: 검증
             run: |
               pwd
-              ls ./dev -al
+              ls -al
             shell: bash
           
           # 도커 허브 로그인 단계 v2/v3
