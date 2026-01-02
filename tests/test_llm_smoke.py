@@ -63,7 +63,7 @@ def ag_module(monkeypatch):
     #   import agent_with_graph as ag
     #   import dev.llm.agent_with_graph as ag
     #   from dev.llm import agent_with_graph as ag
-    from dev.app.llm import agent_with_graph as ag  # <-- 너희 파일 위치에 맞게 수정
+    from main.llm import agent_with_graph as ag  # <-- 너희 파일 위치에 맞게 수정
 
     # 4) 이미 import 되어 있을 수 있으니 reload로 확실히 반영
     ag = importlib.reload(ag)
