@@ -58,14 +58,14 @@ jobs:
             uses: docker/build-push-action@v4
             with:
               # Dockerfile 위치
-              context: .
+              context: ./main
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
 
           - name: Build and Push ui
             uses: docker/build-push-action@v4
             with:                
-              context: .
+              context: ./ui
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/ui:latest
 
@@ -101,7 +101,7 @@ jobs:
               key: ${{ secrets.EC2_KEY }}
               port: 22
               script: |
-                # cd /home/${{ secrets.EC2_USERNAME }}/deploy/dev
+                # cd /home/${{ secrets.EC2_USERNAME }}/deploy
 
                 # ===============================
                 # .env 파일 생성 (Secrets → Runtime)
