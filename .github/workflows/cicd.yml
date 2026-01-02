@@ -50,7 +50,7 @@ jobs:
         key: ${{ secrets.EC2_KEY }}
         script: |
           cd ~/deploy
-
+          mv Docker-compose.yml docker-compose.yml
 
           docker-compose down
           docker-compose pull
