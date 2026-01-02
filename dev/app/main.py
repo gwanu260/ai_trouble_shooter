@@ -60,17 +60,6 @@ async def analyze_log(req: AnalyzeRequest):
         masked_log = masker.mask(log_content).strip()
         masked_code = masker.mask(code_content).strip()
 
-        # ==========================================================
-        # [수정 부분] 보안 확인을 위한 터미널 출력 로그 추가
-        # 실제 IP가 아닌 [IP_ADDR_0] 형태로 출력되는지 확인할 수 있습니다.
-        # ==========================================================
-        print("\n" + "="*50)
-        print("🔒 [보안 확인] LLM으로 전송되는 마스킹된 데이터")
-        print(f"📡 Masked Log: {masked_log[:200]}{'...' if len(masked_log) > 200 else ''}")
-        print(f"💻 Masked Code: {masked_code[:200]}{'...' if len(masked_code) > 200 else ''}")
-        print("="*50 + "\n")
-        # ==========================================================
-        
         initial_state = {
             "messages": [], 
             "persona": req.persona,
