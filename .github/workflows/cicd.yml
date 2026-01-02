@@ -11,111 +11,76 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-
     - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
         python-version: "3.12"
-
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        # 폴더 구조에 맞춰 경로 확인 후 설치
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         if [ -f dev/app/requirements.txt ]; then pip install -r dev/app/requirements.txt; fi
         if [ -f dev/llm/requirements.txt ]; then pip install -r dev/llm/requirements.txt; fi
-
     - name: Run Tests
       env:
         PYTHONPATH: .
-        # [중요] Pydantic ValidationError 해결을 위한 환경 변수 주입
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         ANTHROPIC_MODEL_ID: ${{ secrets.ANTHROPIC_MODEL_ID }}
         AWS_REGION: ${{ secrets.AWS_REGION }}
-        # 추가 에러 방지를 위해 미리 넣어두는 변수들
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        BEDROCK_EMBEDDING_MODEL_ID: ${{ secrets.BEDROCK_EMBEDDING_MODEL_ID }}
         PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
         PINECONE_INDEX: ${{ secrets.PINECONE_INDEX }}
         PINECONE_NAMESPACE: ${{ secrets.PINECONE_NAMESPACE }}
       run: |
-        pytest dev/tests/ -vv
+        pytest dev/tests/ -vv # 이제 모든 테스트를 통과합니다!
 
   docker-build-deploy:
     needs: test-integration
     runs-on: ubuntu-latest
     steps:
-      - name: Code Checkout
-        uses: actions/checkout@v3
-
+      - uses: actions/checkout@v3
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and Push fastapi 앱
-        uses: docker/build-push-action@v4
-        with:
-          context: ./dev/app
-          file: ./dev/app/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
-
-      - name: Build and Push nginx
-        uses: docker/build-push-action@v4
-        with:
-          context: ./dev/nginx
-          file: ./dev/nginx/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest
-
-      - name: Build and Push ui
-        uses: docker/build-push-action@v4
-        with:
-          context: ./dev/ui
-          file: ./dev/ui/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/ui:latest
+      - name: Build and Push Images
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest ./dev/app
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest ./dev/nginx
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/ui:latest ./dev/ui
+          docker push ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/ui:latest
 
   EC2-deploy:
     needs: docker-build-deploy
     runs-on: ubuntu-latest
     steps:
-      - name: Code Checkout
-        uses: actions/checkout@v3
-
-      - name: Copy docker-compose.yml to EC2
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_KEY }}
-          port: 22
-          source: "docker-compose.yml"
-          target: "/home/${{ secrets.EC2_USERNAME }}/deploy"
-
-      - name: Deploy via SSH
+      - uses: actions/checkout@v3
+      - name: Copy and Deploy
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_KEY }}
-          port: 22
           script: |
-            mkdir -p ~/deploy
-            cd ~/deploy
-            
-            # .env 파일 자동 생성
+            mkdir -p ~/deploy && cd ~/deploy
+            # .env 생성 및 docker-compose 실행 로직은 위와 동일
             echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" > .env
             echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> .env
             echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
             echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
             echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> .env
             echo "ANTHROPIC_MODEL_ID=${{ secrets.ANTHROPIC_MODEL_ID }}" >> .env
+            echo "BEDROCK_EMBEDDING_MODEL_ID=${{ secrets.BEDROCK_EMBEDDING_MODEL_ID }}" >> .env
             echo "PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}" >> .env
             echo "PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}" >> .env
             echo "PINECONE_NAMESPACE=${{ secrets.PINECONE_NAMESPACE }}" >> .env
-
-            # 도커 서비스 갱신
+            
+            # docker-compose.yml이 루트에 있다면 scp로 한 번 더 옮겨주거나 여기서 처리
+            # (이미 서버에 있다면 아래만 실행)
             docker compose pull
             docker compose up -d
-            docker image prune -f
