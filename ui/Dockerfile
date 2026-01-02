@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 4. UI 코드 복사
-COPY ui/app.py .
+COPY . .
 
 # 5. Streamlit 포트
 EXPOSE 8501

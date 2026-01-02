@@ -58,8 +58,8 @@ jobs:
             uses: docker/build-push-action@v4
             with:
               # Dockerfile 위치
-              context: ./app
-              file: ./app/Dockerfile
+              context: ./main
+              file: Dockerfile
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
 
@@ -67,7 +67,7 @@ jobs:
             uses: docker/build-push-action@v4
             with:                
               context: ./ui
-              file: ./ui/Dockerfile
+              file: Dockerfile
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/ui:latest
 
