@@ -34,7 +34,8 @@ jobs:
         pytest tests/ -vv
 
   # git build push 작업
-  docker-build-deploy:        
+  docker-build-deploy:
+      needs: test-integration
       runs-on: ubuntu-latest
       steps:        
           - name: Code Checkout
@@ -68,6 +69,7 @@ jobs:
               context: ./ui
               push: true
               tags: ${{ secrets.DOCKER_USERNAME }}/ui:latest
+
 
   EC2-deploy:
     needs: docker-build-deploy
