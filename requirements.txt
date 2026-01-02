@@ -18,3 +18,5 @@ cryptography==46.0.3
 streamlit
 requests
 python-dotenv
+
+pytest
