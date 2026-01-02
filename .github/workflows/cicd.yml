@@ -82,7 +82,7 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_KEY }}
           port: 22
-          source: "docker-compose.yml"
+          source: "Docker-compose.yml"
           target: "/home/${{ secrets.EC2_USERNAME }}/deploy"
 
       - name: Deploy via SSH
@@ -94,6 +94,7 @@ jobs:
           port: 22
           script: |
             export DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
+            export DOCKER_PASSWORD="${{ secrets.DOCKER_PASSWORD }}"
             export AWS_REGION="${{ secrets.AWS_REGION }}"
             export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
             export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
@@ -115,6 +116,7 @@ jobs:
             # ===== 4. (선택) .env 생성 — 필요하면만 =====
             cat > .env <<-EOF
               DOCKER_USERNAME=$DOCKER_USERNAME
+              DOCKER_PASSWORD=$DOCKER_PASSWORD
               AWS_REGION=$AWS_REGION
               AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
               AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
