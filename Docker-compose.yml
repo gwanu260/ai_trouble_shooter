@@ -1,9 +1,11 @@
 services:
   api:
+    build:
+      context: .
+      dockerfile: dev/app/Dockerfile
     image: ${DOCKER_USERNAME}/fastapi-app:latest
     container_name: fastapi_app
     restart: always
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
     env_file:
       - .env
     ports:
@@ -12,10 +14,12 @@ services:
       - my-net
 
   ui:
-    image: ${DOCKER_USERNAME}/fastapi-app:latest
+    build:
+      context: .
+      dockerfile: dev/ui/Dockerfile
+    image: ${DOCKER_USERNAME}/ui:latest
     container_name: streamlit_ui
     restart: always
-    command: streamlit run ui.py --server.address 0.0.0.0 --server.port 8501
     env_file:
       - .env
     ports:
@@ -26,6 +30,9 @@ services:
       - my-net
 
   nginx:
+    build:
+      context: .
+      dockerfile: dev/nginx/Dockerfile
     image: ${DOCKER_USERNAME}/nginx-proxy:latest
     container_name: nginx_proxy
     restart: always
