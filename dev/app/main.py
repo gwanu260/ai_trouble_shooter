@@ -83,13 +83,14 @@ async def analyze_log(req: AnalyzeRequest):
         final_state = app_graph.invoke(initial_state)
         raw_text = final_state["messages"][-1].content.strip()
 
-        # 3. 강화된 추출 로직 및 언마스킹 수행
+        # 3. [강화된 추출 로직] 상세 내용을 끝까지 긁어오고 동시에 언마스킹 수행
         def robust_extract_and_unmask(field, text):
+            # JSON 스타일 ("field": "value") 뿐만 아니라 마크다운 스타일까지 모두 대응하는 패턴 리스트
             patterns = [
-                rf'"{field}"\s*:\s*"(.*?)"(?=\s*,\s*"|\s*}}\s*$|\s*}}?\s*```|$)',
-                rf'"{field}"\s*:\s*(.*?)(?=\n\s*"\w+"|$)',
-                rf'\*\*{field}\*\*[:\s]+(.*?)(?=\n\*\*|$)',
-                rf'{field}[:\s]+(.*?)(?=\n\w+[:\s]|$)'
+                rf'"{field}"\s*:\s*"(.*?)"(?=\s*,\s*"|\s*}}\s*$|\s*}}?\s*```|$)', # 표준 JSON
+                rf'"{field}"\s*:\s*(.*?)(?=\n\s*"\w+"|$)', # 따옴표가 없는 값
+                rf'\*\*{field}\*\*[:\s]+(.*?)(?=\n\*\*|$)', # 마크다운 (**cause**: 내용)
+                rf'{field}[:\s]+(.*?)(?=\n\w+[:\s]|$)' # 일반 텍스트 (cause: 내용)
             ]
             
             extracted = None
@@ -100,12 +101,27 @@ async def analyze_log(req: AnalyzeRequest):
                     break
             
             if extracted:
+                # 불필요한 따옴표, 이스케이프 제거 및 언마스킹
                 clean_text = extracted.strip('"').replace('\\n', '\n').replace('\\"', '"').strip()
-                # 여기서 마스킹 해제(복구)가 일어납니다.
                 return masker.unmask(clean_text)
             
-            return f"{field} 분석 정보 추출 실패"
+            # 최후의 수단: 문자열 인덱스로 직접 찾기
+            try:
+                search_key = f'"{field}"'
+                if search_key in text:
+                    start_idx = text.find(search_key) + len(search_key)
+                    # 콜론(:)과 따옴표(") 건너뛰기
+                    after_key = text[start_idx:].lstrip(' :\"')
+                    # 다음 필드 구분자( ", )나 종료 기호( "} ) 전까지 잘라냄
+                    end_pos = re.search(r'["\s]*[,}]', after_key)
+                    if end_pos:
+                        return masker.unmask(after_key[:end_pos.start()].strip())
+            except:
+                pass
 
+            return f"{field} 분석 정보 추출 실패 (LLM 응답 형식 확인 필요)"
+
+        # 각 필드별로 데이터 추출 실행
         return {
             "cause": robust_extract_and_unmask("cause", raw_text),
             "solution": robust_extract_and_unmask("solution", raw_text),
