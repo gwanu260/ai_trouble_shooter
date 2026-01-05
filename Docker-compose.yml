@@ -1,0 +1,49 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: dev/app/Dockerfile
+    image: ${DOCKER_USERNAME}/fastapi-app:latest
+    container_name: fastapi_app
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    networks:
+      - my-net
+
+  ui:
+    build:
+      context: .
+      dockerfile: dev/ui/Dockerfile
+    image: ${DOCKER_USERNAME}/ui:latest
+    container_name: streamlit_ui
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    networks:
+      - my-net
+
+  nginx:
+    build:
+      context: .
+      dockerfile: dev/nginx/Dockerfile
+    image: ${DOCKER_USERNAME}/nginx-proxy:latest
+    container_name: nginx_proxy
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+      - ui
+    networks:
+      - my-net
+
+networks:
+  my-net:
+    driver: bridge

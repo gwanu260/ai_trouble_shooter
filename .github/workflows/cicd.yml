@@ -1,6 +1,5 @@
-name: AI Trouble Shooter
+name: AI Trouble Shooter CI/CD
 
-# 언제 실행될지 정의 (main 브랜치에 push나 pull_request 발생 시)
 on:
   push:
     branches: [ "main" ]
@@ -10,25 +9,99 @@ on:
 jobs:
   test-integration:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
-
     - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
         python-version: "3.12"
-
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    # API와 UI 테스트를 한 번에 실행 (폴더 지정)
-    # -vv 옵션으로 상세 로그 확인
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        if [ -f dev/app/requirements.txt ]; then pip install -r dev/app/requirements.txt; fi
+        if [ -f dev/llm/requirements.txt ]; then pip install -r dev/llm/requirements.txt; fi
     - name: Run Tests
-      # 현재 디렉토리(.)를 Python이 모듈을 찾는 경로에 추가합니다.
       env:
         PYTHONPATH: .
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        ANTHROPIC_MODEL_ID: ${{ secrets.ANTHROPIC_MODEL_ID }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        BEDROCK_EMBEDDING_MODEL_ID: ${{ secrets.BEDROCK_EMBEDDING_MODEL_ID }}
+        PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+        PINECONE_INDEX: ${{ secrets.PINECONE_INDEX }}
+        PINECONE_NAMESPACE: ${{ secrets.PINECONE_NAMESPACE }}
       run: |
         pytest dev/tests/ -vv
+
+  docker-build-deploy:
+    needs: test-integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build and Push Images
+        run: |
+          # 빌드 컨텍스트를 루트(.)로 지정하여 상위 폴더 참조 가능하게 함
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest -f dev/app/Dockerfile .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/ui:latest -f dev/ui/Dockerfile .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest -f dev/nginx/Dockerfile .
+          
+          docker push ${{ secrets.DOCKER_USERNAME }}/fastapi-app:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/ui:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/nginx-proxy:latest
+
+  EC2-deploy:
+    needs: docker-build-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Copy docker-compose.yml to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          source: "[Dd]ocker-compose.yml"
+          target: "/home/${{ secrets.EC2_USERNAME }}/deploy"
+          strip_components: 0
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          script: |
+            mkdir -p ~/deploy && cd ~/deploy
+            mv Docker-compose.yml docker-compose.yml 2>/dev/null || true
+            
+            echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" > .env
+            echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> .env
+            echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
+            echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
+            echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> .env
+            echo "ANTHROPIC_MODEL_ID=${{ secrets.ANTHROPIC_MODEL_ID }}" >> .env
+            echo "BEDROCK_EMBEDDING_MODEL_ID=${{ secrets.BEDROCK_EMBEDDING_MODEL_ID }}" >> .env
+            echo "PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}" >> .env
+            echo "PINECONE_INDEX=${{ secrets.PINECONE_INDEX }}" >> .env
+            echo "PINECONE_NAMESPACE=${{ secrets.PINECONE_NAMESPACE }}" >> .env
+
+            if [ -f "docker-compose.yml" ]; then
+              sudo docker compose pull
+              sudo docker compose up -d
+              sudo docker image prune -f
+            else
+              echo "Error: docker-compose.yml not found."
+              ls -al
+              exit 1
+            fi
